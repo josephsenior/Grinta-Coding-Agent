@@ -231,27 +231,31 @@ def _project_intervention(summary: dict[str, Any], data: dict[str, Any]) -> None
         reliability['circuit_breaker_triggers'] += 1
 
 
+def _contract_items(contract: dict[str, Any]) -> list[dict[str, Any]]:
+    return [
+        row
+        for group in ('requirements', 'constraints', 'success_conditions')
+        for row in contract.get(group, [])
+        if isinstance(row, dict)
+    ]
+
+
+def _contract_row_has_linked_evidence(row: dict[str, Any]) -> bool:
+    return bool(row.get('evidence')) and any(
+        item.get('source_event_ids')
+        for item in row.get('evidence', [])
+        if isinstance(item, dict)
+    )
+
+
 def _project_contract(
     summary: dict[str, Any], task_state: dict[str, Any] | None
 ) -> None:
     if not isinstance(task_state, dict):
         return
     contract = task_state.get('contract') or {}
-    items = [
-        row
-        for group in ('requirements', 'constraints', 'success_conditions')
-        for row in contract.get(group, [])
-        if isinstance(row, dict)
-    ]
-    linked = sum(
-        bool(row.get('evidence'))
-        and any(
-            item.get('source_event_ids')
-            for item in row.get('evidence', [])
-            if isinstance(item, dict)
-        )
-        for row in items
-    )
+    items = _contract_items(contract)
+    linked = sum(_contract_row_has_linked_evidence(row) for row in items)
     summary['contract']['total_criteria'] = len(items)
     summary['contract']['criteria_with_linked_evidence'] = linked
     summary['contract']['criteria_without_linked_evidence'] = len(items) - linked

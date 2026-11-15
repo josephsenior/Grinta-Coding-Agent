@@ -159,6 +159,22 @@ def _notify_guard_warning_once(
         orch._tui.notify(first_line, severity='warning', timeout=4.0)
 
 
+def _handle_special_error_notification(
+    orch: 'RendererEventProcessorMixin',
+    event: ErrorObservation,
+    content: str,
+    error_category: str | None,
+    error_id: str,
+) -> bool:
+    if error_id == 'CIRCUIT_BREAKER_WARNING':
+        _notify_guard_warning_once(orch, content, error_id=error_id)
+        return True
+    if getattr(event, 'notify_ui_only', False):
+        _notify_ui_only_error(orch, content, error_category, error_id=error_id or None)
+        return True
+    return False
+
+
 def _handle_error_observation(
     orch: 'RendererEventProcessorMixin', event: ErrorObservation
 ) -> None:
@@ -177,11 +193,9 @@ def _handle_error_observation(
     if error_category in TRANSIENT_HUD_ONLY_CATEGORIES:
         return
     error_id = str(getattr(event, 'error_id', '') or '')
-    if error_id == 'CIRCUIT_BREAKER_WARNING':
-        _notify_guard_warning_once(orch, content, error_id=error_id)
-        return
-    if getattr(event, 'notify_ui_only', False):
-        _notify_ui_only_error(orch, content, error_category, error_id=error_id or None)
+    if _handle_special_error_notification(
+        orch, event, content, error_category, error_id
+    ):
         return
 
     fail_card = getattr(orch, '_fail_tool_scan_card', None)
@@ -197,50 +211,70 @@ def _handle_error_observation(
     orch._tui.add_warning(content)
 
 
-def _show_dap_install_hint_if_needed(
-    orch: 'RendererEventProcessorMixin', event: ErrorObservation
-) -> None:
-    """Show a non-persistent toast with install instructions for a missing DAP adapter."""
-    adapter = getattr(event, '_dap_adapter', '') or ''
-    language = getattr(event, '_dap_language', '') or ''
-    content = event.content or ''
-
-    is_not_installed = (
+def _dap_error_is_missing_install(content: str) -> bool:
+    return (
         'is not installed' in content
         or 'No module named' in content
         or 'not found' in content.lower()
     )
-    if not is_not_installed:
-        return
 
+
+def _dap_install_recipe(language: str, adapter: str) -> tuple[str, str]:
     from backend.execution.dap._dap_adapters import _DAP_ADAPTER_RECIPES
 
     recipe = _DAP_ADAPTER_RECIPES.get(language) or _DAP_ADAPTER_RECIPES.get(adapter)
     if not recipe:
+        return '', ''
+    return recipe.get('install_hint', ''), recipe.get('docs', '')
+
+
+def _dap_install_targets(event: ErrorObservation) -> tuple[str, str]:
+    adapter = getattr(event, '_dap_adapter', '') or ''
+    language = getattr(event, '_dap_language', '') or ''
+    return language, adapter
+
+
+def _claim_dap_install_notification(
+    orch: 'RendererEventProcessorMixin', dedup_key: str
+) -> Any | None:
+    tui = getattr(orch, '_tui', None)
+    if tui is None:
+        return None
+    notified = getattr(tui, '_dap_notified_languages', None)
+    if notified is None:
+        return None
+    if dedup_key in notified:
+        return None
+    notified.add(dedup_key)
+    return tui
+
+
+def _dap_install_hint_text(
+    language: str, adapter: str, install_hint: str, docs: str
+) -> str:
+    hint = f'{adapter or language} debug adapter is not installed. Run: {install_hint}'
+    return f'{hint}  ({docs})' if docs else hint
+
+
+def _show_dap_install_hint_if_needed(
+    orch: 'RendererEventProcessorMixin', event: ErrorObservation
+) -> None:
+    """Show a non-persistent toast with install instructions for a missing DAP adapter."""
+    language, adapter = _dap_install_targets(event)
+    if not _dap_error_is_missing_install(event.content or ''):
         return
 
-    install_hint = recipe.get('install_hint', '')
-    docs = recipe.get('docs', '')
+    install_hint, docs = _dap_install_recipe(language, adapter)
     if not install_hint:
         return
 
-    # Session-level dedup
-    tui = getattr(orch, '_tui', None)
+    tui = _claim_dap_install_notification(orch, language or adapter)
     if tui is None:
         return
-    notified = getattr(tui, '_dap_notified_languages', None)
-    if notified is None:
-        return
-    dedup_key = language or adapter
-    if dedup_key in notified:
-        return
-    notified.add(dedup_key)
-
-    hint = f'{adapter or language} debug adapter is not installed. Run: {install_hint}'
-    if docs:
-        hint += f'  ({docs})'
-
-    tui.notify_warning(hint, timeout=6.0)
+    tui.notify_warning(
+        _dap_install_hint_text(language, adapter, install_hint, docs),
+        timeout=6.0,
+    )
 
 
 def _backoff_hud_label_active(hud: Any) -> bool:
@@ -307,6 +341,42 @@ def _handle_success_observation(
     orch._tui.add_success(event.content or 'Done')
 
 
+def _retry_delay_seconds(extras: dict) -> float:
+    delay_seconds = extras.get('delay_seconds')
+    try:
+        return float(delay_seconds) if delay_seconds is not None else 0.0
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _arm_retry_countdown(
+    orch: 'RendererEventProcessorMixin',
+    extras: dict,
+    delay: float,
+) -> None:
+    if delay <= 0:
+        return
+    arm = getattr(orch._tui, 'arm_retry_countdown', None)
+    if not callable(arm):
+        return
+    arm(
+        attempt=max(1, int(extras.get('attempt') or 1)),
+        max_attempts=max(
+            1,
+            int(extras.get('max_attempts') or extras.get('attempt') or 1),
+        ),
+        delay_seconds=delay,
+        reason=str(extras.get('reason') or 'transient failure'),
+        source=str(extras.get('source') or ''),
+    )
+
+
+def _clear_retry_countdown(orch: 'RendererEventProcessorMixin') -> None:
+    clear = getattr(orch._tui, '_clear_retry_countdown', None)
+    if callable(clear):
+        clear()
+
+
 def _handle_status_retry(
     orch: 'RendererEventProcessorMixin',
     status_type: str,
@@ -318,28 +388,9 @@ def _handle_status_retry(
     orch._tui.set_agent_phase(label)
     orch._update_retry_strip(label, message)
     if status_type in ('retry_pending', 'llm_retry_pending'):
-        delay_seconds = extras.get('delay_seconds')
-        try:
-            delay = float(delay_seconds) if delay_seconds is not None else 0.0
-        except (TypeError, ValueError):
-            delay = 0.0
-        if delay > 0:
-            arm = getattr(orch._tui, 'arm_retry_countdown', None)
-            if callable(arm):
-                arm(
-                    attempt=max(1, int(extras.get('attempt') or 1)),
-                    max_attempts=max(
-                        1,
-                        int(extras.get('max_attempts') or extras.get('attempt') or 1),
-                    ),
-                    delay_seconds=delay,
-                    reason=str(extras.get('reason') or 'transient failure'),
-                    source=str(extras.get('source') or ''),
-                )
+        _arm_retry_countdown(orch, extras, _retry_delay_seconds(extras))
     elif status_type in ('retry_resuming', 'llm_retry_resuming'):
-        clear = getattr(orch._tui, '_clear_retry_countdown', None)
-        if callable(clear):
-            clear()
+        _clear_retry_countdown(orch)
 
 
 def _handle_status_compaction(

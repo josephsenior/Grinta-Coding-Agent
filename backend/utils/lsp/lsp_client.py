@@ -833,42 +833,37 @@ class LspClient:
             return False
         return True
 
-    def _query_document_symbols(
+    def _document_symbols_via_session(
         self,
+        session: Any,
+        ctx: Any,
+        uri: str,
+        symbol_filter: str,
+        timeout: float,
+    ) -> LspResult:
+        if not session.supports('textDocument/documentSymbol'):
+            return self._unsupported_result(ctx, 'textDocument/documentSymbol')
+        response = session.request(
+            'textDocument/documentSymbol',
+            {'textDocument': {'uri': uri}},
+            timeout=timeout,
+        )
+        if response is None:
+            return self._server_failed()
+        if 'result' not in response:
+            return self._error_result(response, hint='documentSymbol')
+        symbols = self._parse_document_symbols(response.get('result'), symbol_filter)
+        return LspResult(available=True, symbols=symbols)
+
+    def _document_symbols_via_oneshot(
+        self,
+        ctx: Any,
         abs_path: str,
         uri: str,
         source: str,
         symbol_filter: str,
-        *,
-        process_timeout: float | None = None,
-        post_edit: bool = False,
+        timeout: float,
     ) -> LspResult:
-        ctx = self._get_context(abs_path)
-        if ctx is None:
-            return self._unavailable(abs_path)
-
-        timeout = self._resolve_timeout(ctx, process_timeout, post_edit=post_edit)
-        session, use_fallback = self._use_session(ctx, uri, ctx.language_id, source)
-        if session is not None:
-            if not session.supports('textDocument/documentSymbol'):
-                return self._unsupported_result(ctx, 'textDocument/documentSymbol')
-            response = session.request(
-                'textDocument/documentSymbol',
-                {'textDocument': {'uri': uri}},
-                timeout=timeout,
-            )
-            if response is None:
-                return self._server_failed()
-            if 'result' not in response:
-                return self._error_result(response, hint='documentSymbol')
-            symbols = self._parse_document_symbols(
-                response.get('result'), symbol_filter
-            )
-            return LspResult(available=True, symbols=symbols)
-
-        if not use_fallback:
-            return self._server_failed()
-
         server_cmd = list(ctx.command)
         msgs = self._build_init_msgs(uri, abs_path, source)
         msgs.append(
@@ -904,6 +899,43 @@ class LspClient:
 
         return LspResult(available=True, symbols=[])
 
+    def _query_document_symbols(
+        self,
+        abs_path: str,
+        uri: str,
+        source: str,
+        symbol_filter: str,
+        *,
+        process_timeout: float | None = None,
+        post_edit: bool = False,
+    ) -> LspResult:
+        ctx = self._get_context(abs_path)
+        if ctx is None:
+            return self._unavailable(abs_path)
+
+        timeout = self._resolve_timeout(ctx, process_timeout, post_edit=post_edit)
+        session, use_fallback = self._use_session(ctx, uri, ctx.language_id, source)
+        if session is not None:
+            return self._document_symbols_via_session(
+                session,
+                ctx,
+                uri,
+                symbol_filter,
+                timeout,
+            )
+
+        if not use_fallback:
+            return self._server_failed()
+
+        return self._document_symbols_via_oneshot(
+            ctx,
+            abs_path,
+            uri,
+            source,
+            symbol_filter,
+            timeout,
+        )
+
     def _parse_document_symbols(
         self, result: Any, symbol_filter: str
     ) -> list[LspSymbol]:
@@ -934,43 +966,41 @@ class LspClient:
         symbols.sort(key=lambda s: (s.line, s.name))
         return symbols
 
-    def _query_hover(
+    def _hover_via_session(
         self,
+        session: Any,
+        ctx: Any,
+        uri: str,
+        lsp_line: int,
+        lsp_col: int,
+        timeout: float,
+    ) -> LspResult:
+        if not session.supports('textDocument/hover'):
+            return self._unsupported_result(ctx, 'textDocument/hover')
+        response = session.request(
+            'textDocument/hover',
+            {
+                'textDocument': {'uri': uri},
+                'position': {'line': lsp_line, 'character': lsp_col},
+            },
+            timeout=timeout,
+        )
+        if response is None:
+            return self._server_failed()
+        if 'result' not in response:
+            return self._error_result(response, hint='hover')
+        return self._parse_hover_response(response['result'])
+
+    def _hover_via_oneshot(
+        self,
+        ctx: Any,
         abs_path: str,
         uri: str,
         source: str,
         lsp_line: int,
         lsp_col: int,
-        *,
-        process_timeout: float | None = None,
-        post_edit: bool = False,
+        timeout: float,
     ) -> LspResult:
-        ctx = self._get_context(abs_path)
-        if ctx is None:
-            return self._unavailable(abs_path)
-
-        timeout = self._resolve_timeout(ctx, process_timeout, post_edit=post_edit)
-        session, use_fallback = self._use_session(ctx, uri, ctx.language_id, source)
-        if session is not None:
-            if not session.supports('textDocument/hover'):
-                return self._unsupported_result(ctx, 'textDocument/hover')
-            response = session.request(
-                'textDocument/hover',
-                {
-                    'textDocument': {'uri': uri},
-                    'position': {'line': lsp_line, 'character': lsp_col},
-                },
-                timeout=timeout,
-            )
-            if response is None:
-                return self._server_failed()
-            if 'result' not in response:
-                return self._error_result(response, hint='hover')
-            return self._parse_hover_response(response['result'])
-
-        if not use_fallback:
-            return self._server_failed()
-
         server_cmd = list(ctx.command)
         msgs = self._build_init_msgs(uri, abs_path, source)
         msgs.append(self._build_hover_request_message(uri, lsp_line, lsp_col))
@@ -995,6 +1025,46 @@ class LspClient:
                 return self._parse_hover_response(resp['result'])
 
         return LspResult(available=True, hover_text='No hover info')
+
+    def _query_hover(
+        self,
+        abs_path: str,
+        uri: str,
+        source: str,
+        lsp_line: int,
+        lsp_col: int,
+        *,
+        process_timeout: float | None = None,
+        post_edit: bool = False,
+    ) -> LspResult:
+        ctx = self._get_context(abs_path)
+        if ctx is None:
+            return self._unavailable(abs_path)
+
+        timeout = self._resolve_timeout(ctx, process_timeout, post_edit=post_edit)
+        session, use_fallback = self._use_session(ctx, uri, ctx.language_id, source)
+        if session is not None:
+            return self._hover_via_session(
+                session,
+                ctx,
+                uri,
+                lsp_line,
+                lsp_col,
+                timeout,
+            )
+
+        if not use_fallback:
+            return self._server_failed()
+
+        return self._hover_via_oneshot(
+            ctx,
+            abs_path,
+            uri,
+            source,
+            lsp_line,
+            lsp_col,
+            timeout,
+        )
 
     def _build_hover_request_message(
         self, uri: str, lsp_line: int, lsp_col: int

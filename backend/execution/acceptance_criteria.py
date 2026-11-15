@@ -160,15 +160,9 @@ class AcceptanceCriteriaMixin:
                 criteria_list=action.criteria_list,
             )
 
-        criteria_list = list(action.criteria_list)
-        if action.command == 'audit' and action.audit_entries:
-            try:
-                criteria_list = self._apply_audit_entries(action)
-            except ValueError as e:
-                return ErrorObservation(str(e))
-            except Exception as e:
-                logger.warning('Acceptance criteria audit failed', exc_info=True)
-                return ErrorObservation(f'Acceptance criteria audit failed: {e!s}')
+        criteria_list, audit_error = self._resolve_criteria_write_list(action)
+        if audit_error is not None:
+            return audit_error
 
         try:
             content = self._generate_criteria_markdown(criteria_list)
@@ -182,48 +176,80 @@ class AcceptanceCriteriaMixin:
         if persist_error is not None:
             return persist_error
 
-        n = len(criteria_list)
-        if action.command == 'update':
-            msg = (
-                f'✅ Acceptance criteria defined ({n} items). '
-                'Next: `task_tracker(update, ...)` if enabled, then begin implementation.'
-            )
-        elif action.command == 'append':
-            msg = f'✅ Acceptance criteria updated ({n} total).'
-        else:
-            msg = f'✅ Acceptance criteria audit recorded for {n} item(s).'
         return AcceptanceCriteriaObservation(
-            content=msg,
+            content=self._criteria_write_message(action.command, len(criteria_list)),
             command=action.command,
             criteria_list=criteria_list,
         )
 
-    def _apply_audit_entries(
+    def _resolve_criteria_write_list(
         self, action: AcceptanceCriteriaAction
-    ) -> list[dict[str, Any]]:
-        by_id = {
-            str(item.get('id') or '').strip(): dict(item)
-            for item in action.criteria_list
-            if str(item.get('id') or '').strip()
-        }
-        for entry in action.audit_entries:
-            criterion_id = str(entry.get('criterion_id') or '').strip()
-            row = by_id.get(criterion_id)
-            if row is None:
-                msg = f'Audit entry references unknown criterion_id {criterion_id!r}'
-                raise ValueError(msg)
+    ) -> tuple[list[dict[str, Any]], ErrorObservation | None]:
+        criteria_list = list(action.criteria_list)
+        if action.command != 'audit' or not action.audit_entries:
+            return criteria_list, None
+        try:
+            return self._apply_audit_entries(action), None
+        except ValueError as e:
+            return criteria_list, ErrorObservation(str(e))
+        except Exception as e:
+            logger.warning('Acceptance criteria audit failed', exc_info=True)
+            return criteria_list, ErrorObservation(
+                f'Acceptance criteria audit failed: {e!s}'
+            )
 
-            evidence = str(entry.get('evidence') or '').strip()
-            if not evidence:
-                msg = f'Audit entry for {criterion_id!r} requires non-empty evidence.'
-                raise ValueError(msg)
-            row['evidence'] = evidence
+    @staticmethod
+    def _criteria_write_message(command: str, count: int) -> str:
+        if command == 'update':
+            return (
+                f'✅ Acceptance criteria defined ({count} items). '
+                'Next: `task_tracker(update, ...)` if enabled, then begin implementation.'
+            )
+        if command == 'append':
+            return f'✅ Acceptance criteria updated ({count} total).'
+        return f'✅ Acceptance criteria audit recorded for {count} item(s).'
 
-        missing = [
+    @staticmethod
+    def _criteria_by_id(criteria_list: list) -> dict[str, dict[str, Any]]:
+        by_id: dict[str, dict[str, Any]] = {}
+        for item in criteria_list:
+            criterion_id = str(item.get('id') or '').strip()
+            if criterion_id:
+                by_id[criterion_id] = dict(item)
+        return by_id
+
+    @staticmethod
+    def _apply_audit_entry(
+        by_id: dict[str, dict[str, Any]], entry: dict[str, Any]
+    ) -> None:
+        criterion_id = str(entry.get('criterion_id') or '').strip()
+        row = by_id.get(criterion_id)
+        if row is None:
+            msg = f'Audit entry references unknown criterion_id {criterion_id!r}'
+            raise ValueError(msg)
+
+        evidence = str(entry.get('evidence') or '').strip()
+        if not evidence:
+            msg = f'Audit entry for {criterion_id!r} requires non-empty evidence.'
+            raise ValueError(msg)
+        row['evidence'] = evidence
+
+    @staticmethod
+    def _missing_audit_evidence(by_id: dict[str, dict[str, Any]]) -> list[str]:
+        return [
             criterion_id
             for criterion_id, row in by_id.items()
             if not str(row.get('evidence') or '').strip()
         ]
+
+    def _apply_audit_entries(
+        self, action: AcceptanceCriteriaAction
+    ) -> list[dict[str, Any]]:
+        by_id = self._criteria_by_id(action.criteria_list)
+        for entry in action.audit_entries:
+            self._apply_audit_entry(by_id, entry)
+
+        missing = self._missing_audit_evidence(by_id)
         if missing:
             raise ValueError(
                 f'Audit incomplete; missing evidence for: {", ".join(sorted(missing))}'
@@ -270,30 +296,41 @@ class AcceptanceCriteriaMixin:
 
         content = '# Acceptance Criteria\n\n'
         for i, item in enumerate(criteria_list, 1):
-            if not isinstance(item, dict):
-                raise ValueError(f'Criterion {i} must be a dictionary')
-            assertion = str(item.get('assertion') or '').strip()
-            if not assertion:
-                raise ValueError(f'Criterion {i} is missing assertion')
-            source = str(item.get('source') or 'stated').strip().lower()
-            evidence = str(item.get('evidence') or '').strip()
-            criterion_id = str(item.get('id') or '').strip()
-            id_prefix = f'[{criterion_id}] ' if criterion_id else ''
-            line = f'{i}. {id_prefix}({source}) {assertion}'
-            if evidence:
-                line += f' — {evidence}'
-            content += line + '\n'
-            changes = item.get('changes')
-            if isinstance(changes, list):
-                for change in changes:
-                    if not isinstance(change, dict):
-                        continue
-                    reason = str(change.get('reason') or '').strip()
-                    old_assertion = str(change.get('old_assertion') or '').strip()
-                    new_assertion = str(change.get('new_assertion') or '').strip()
-                    if reason and old_assertion and new_assertion:
-                        content += (
-                            f'   - refined: "{old_assertion}" → "{new_assertion}" '
-                            f'({reason})\n'
-                        )
+            content += AcceptanceCriteriaMixin._criteria_item_markdown(i, item)
+        return content
+
+    @staticmethod
+    def _criteria_item_markdown(index: int, item: Any) -> str:
+        if not isinstance(item, dict):
+            raise ValueError(f'Criterion {index} must be a dictionary')
+        assertion = str(item.get('assertion') or '').strip()
+        if not assertion:
+            raise ValueError(f'Criterion {index} is missing assertion')
+        source = str(item.get('source') or 'stated').strip().lower()
+        evidence = str(item.get('evidence') or '').strip()
+        criterion_id = str(item.get('id') or '').strip()
+        id_prefix = f'[{criterion_id}] ' if criterion_id else ''
+        line = f'{index}. {id_prefix}({source}) {assertion}'
+        if evidence:
+            line += f' — {evidence}'
+        changes = AcceptanceCriteriaMixin._criteria_changes_markdown(
+            item.get('changes')
+        )
+        return line + '\n' + changes
+
+    @staticmethod
+    def _criteria_changes_markdown(changes: Any) -> str:
+        if not isinstance(changes, list):
+            return ''
+        content = ''
+        for change in changes:
+            if not isinstance(change, dict):
+                continue
+            reason = str(change.get('reason') or '').strip()
+            old_assertion = str(change.get('old_assertion') or '').strip()
+            new_assertion = str(change.get('new_assertion') or '').strip()
+            if reason and old_assertion and new_assertion:
+                content += (
+                    f'   - refined: "{old_assertion}" → "{new_assertion}" ({reason})\n'
+                )
         return content

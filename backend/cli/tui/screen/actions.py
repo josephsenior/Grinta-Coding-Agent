@@ -8,6 +8,34 @@ from backend.cli.tui.dialogs import ConfirmWidget
 from backend.core.autonomy import normalize_autonomy_level
 
 
+def _scanline_refresh_display(screen: Any) -> Any | None:
+    renderer = getattr(screen, '_renderer', None)
+    if renderer is not None and getattr(renderer, '_async_drain_active', False):
+        return None
+    try:
+        display = screen._get_display()
+    except Exception:
+        return None
+    if getattr(display, '_under_backpressure', False):
+        return None
+    return display
+
+
+def _animatable_scanline_cards(display: Any) -> list[Any]:
+    from backend.cli.tui.widgets.scan_line import ScanLineCard
+
+    # Transcript cards are direct children. Walking ``display.query`` here
+    # traversed every nested diff row four times a second and became
+    # progressively more expensive as the transcript filled.
+    return [
+        child
+        for child in display.children
+        if isinstance(child, ScanLineCard)
+        and child.wants_periodic_refresh
+        and not getattr(child, '_tui_removing', False)
+    ]
+
+
 class ScreenActionsMixin:
     """Action methods of GrintaScreen (scroll/copy/suspend/confirmation)."""
 
@@ -58,30 +86,14 @@ class ScreenActionsMixin:
 
     def _refresh_scanline_cards(self) -> None:
         """Refresh animation-only chrome on direct, active transcript cards."""
-        renderer = getattr(self, '_renderer', None)
-        if renderer is not None and getattr(renderer, '_async_drain_active', False):
+        display = _scanline_refresh_display(self)
+        if display is None:
             return
-        try:
-            display = self._get_display()
-        except Exception:
-            return
-        if getattr(display, '_under_backpressure', False):
-            return
-        from backend.cli.tui.widgets.scan_line import ScanLineCard
         from backend.cli.tui.widgets.scan_line.cards import (
             advance_running_ellipsis_frame,
         )
 
-        # Transcript cards are direct children. Walking ``display.query`` here
-        # traversed every nested diff row four times a second and became
-        # progressively more expensive as the transcript filled.
-        cards = [
-            child
-            for child in display.children
-            if isinstance(child, ScanLineCard)
-            and child.wants_periodic_refresh
-            and not getattr(child, '_tui_removing', False)
-        ]
+        cards = _animatable_scanline_cards(display)
         if not cards:
             return
 

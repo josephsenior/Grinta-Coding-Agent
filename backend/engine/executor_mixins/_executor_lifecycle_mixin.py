@@ -183,20 +183,36 @@ class _ExecutorLifecycleMixin:
         from backend.inference.llm.utils import get_token_count
 
         model = self._llm_model_name(self._llm) or 'gpt-4o'
-        messages = call_params.get('messages') or []
-        prompt_tokens: int | None = None
-        accounting = call_params.get('_prompt_accounting')
-        if isinstance(accounting, dict):
-            full_request = self._positive_int(accounting.get('full_request_tokens'))
-            tool_schema = self._positive_int(accounting.get('tool_schema_tokens')) or 0
-            if full_request is not None and full_request >= tool_schema:
-                # Planner counted these exact messages moments ago.  Reuse that
-                # result while leaving tool/metadata preflight accounting below
-                # unchanged.
-                prompt_tokens = full_request - tool_schema
+        prompt_tokens = self._prompt_tokens_from_accounting(call_params)
         if prompt_tokens is None:
-            prompt_tokens = get_token_count(messages, model=model)
+            prompt_tokens = get_token_count(
+                call_params.get('messages') or [], model=model
+            )
 
+        extra_lines = self._preflight_extra_lines(call_params)
+        if not extra_lines:
+            return prompt_tokens
+
+        extra_tokens = get_token_count(
+            [{'role': 'system', 'content': '\n'.join(extra_lines)}],
+            model=model,
+        )
+        return prompt_tokens + extra_tokens
+
+    def _prompt_tokens_from_accounting(self, call_params: dict[str, Any]) -> int | None:
+        accounting = call_params.get('_prompt_accounting')
+        if not isinstance(accounting, dict):
+            return None
+        full_request = self._positive_int(accounting.get('full_request_tokens'))
+        tool_schema = self._positive_int(accounting.get('tool_schema_tokens')) or 0
+        if full_request is not None and full_request >= tool_schema:
+            # Planner counted these exact messages moments ago.  Reuse that
+            # result while leaving tool/metadata preflight accounting below
+            # unchanged.
+            return full_request - tool_schema
+        return None
+
+    def _preflight_extra_lines(self, call_params: dict[str, Any]) -> list[str]:
         extra_lines: list[str] = []
         for key in sorted(call_params.keys()):
             if key in {
@@ -211,15 +227,7 @@ class _ExecutorLifecycleMixin:
             if value is None:
                 continue
             extra_lines.append(f'{key}:{self._serialize_preflight_payload(value)}')
-
-        if not extra_lines:
-            return prompt_tokens
-
-        extra_tokens = get_token_count(
-            [{'role': 'system', 'content': '\n'.join(extra_lines)}],
-            model=model,
-        )
-        return prompt_tokens + extra_tokens
+        return extra_lines
 
     def _get_checkpoint(self, event_stream: EventStream | None) -> StreamingCheckpoint:
         session_key = self._checkpoint_session_key(event_stream)

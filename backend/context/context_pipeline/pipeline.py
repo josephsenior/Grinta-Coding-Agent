@@ -78,6 +78,84 @@ class _EmptyState:
         pass
 
 
+def _consume_just_compacted(state: State | None) -> bool:
+    if state is None:
+        return False
+    pipe = getattr(state, 'extra_data', {}).get('context_pipeline_state', {})
+    just_compacted = (
+        bool(pipe.get(_JUST_COMPACTED_KEY)) if isinstance(pipe, dict) else False
+    )
+    if just_compacted:
+        pipe = dict(pipe) if isinstance(pipe, dict) else {}
+        pipe[_JUST_COMPACTED_KEY] = False
+        state.set_extra('context_pipeline_state', pipe, source='ContextPipeline')
+    return just_compacted
+
+
+def _mark_emergency_memory_pressure(state: State | None) -> None:
+    if state is not None and hasattr(state, 'set_memory_pressure'):
+        try:
+            state.set_memory_pressure('CRITICAL', source='ContextPipeline')
+        except Exception:
+            logger.debug('Failed to mark emergency memory pressure', exc_info=True)
+
+
+def _reject_collapsed_prompt_window(
+    window: PromptWindowResult,
+    events: list[Event],
+    state: State | None,
+) -> PromptWindowResult | None:
+    if not (
+        window.windowed
+        and window.original_events >= DEFAULT_EMERGENCY_PROMPT_MIN_EVENTS
+        and window.selected_events < DEFAULT_EMERGENCY_PROMPT_MIN_EVENTS
+    ):
+        return None
+    logger.warning(
+        'Emergency prompt window would collapse to %d/%d events; '
+        'returning unwindowed prompt and marking critical memory pressure',
+        window.selected_events,
+        window.original_events,
+    )
+    _mark_emergency_memory_pressure(state)
+    return PromptWindowResult(
+        events=events,
+        original_events=window.original_events,
+        selected_events=len(events),
+        dropped_events=max(0, window.original_events - len(events)),
+        estimated_tokens=window.estimated_tokens,
+        selected_estimated_tokens=window.estimated_tokens,
+        token_budget=window.token_budget,
+        protected_events=0,
+        windowed=False,
+        reason='emergency_window_rejected',
+        cache_fingerprint=prompt_events_fingerprint(events),
+    )
+
+
+def _runtime_snapshot_metadata(state: State) -> dict[str, object]:
+    runtime: dict[str, object] = {}
+    session_id = getattr(state, 'session_id', None)
+    if isinstance(session_id, str) and session_id:
+        runtime['session_id'] = session_id
+    iteration_flag = getattr(state, 'iteration_flag', None)
+    current = getattr(iteration_flag, 'current_value', None)
+    if isinstance(current, int):
+        runtime['iteration'] = current
+    return runtime
+
+
+def _snapshot_has_extracted_context(snapshot: dict[str, Any]) -> bool:
+    return bool(
+        snapshot.get('files_touched')
+        or snapshot.get('recent_errors')
+        or snapshot.get('decisions')
+        or snapshot.get('user_messages')
+        or snapshot.get('test_results')
+        or snapshot.get('background_tasks')
+    )
+
+
 class ContextPipeline:
     """Fixed-order context pipeline replacing compactor strategy roulette.
 
@@ -186,63 +264,17 @@ class ContextPipeline:
         maybe_update(state, post_boundary, llm_config=llm_config)
 
         turn_signals = getattr(state, 'turn_signals', None)
-        prewarmed = getattr(turn_signals, 'prewarmed_compaction', None)
-        if prewarmed is not None and isinstance(prewarmed, Compaction):
-            if is_prewarm_stale(history, turn_signals):
-                logger.warning(
-                    'Discarding stale pre-warmed compaction '
-                    '(prewarm_len=%s current_len=%d prewarm_latest_id=%s current_latest_id=%s)',
-                    getattr(turn_signals, 'prewarm_history_len', None),
-                    len(history),
-                    getattr(turn_signals, 'prewarm_latest_event_id', None),
-                    getattr(history[-1], 'id', None) if history else None,
-                )
-                clear_prewarm_signals(turn_signals)
-            else:
-                clear_prewarm_signals(turn_signals)
-                action = prewarmed.action
-                if (
-                    isinstance(action, CondensationAction)
-                    and (action.summary or '').strip()
-                ):
-                    budget = ContextBudget.from_events(
-                        post_boundary,
-                        llm_config=llm_config,
-                        state=state,
-                    )
-                    if should_skip_compaction(
-                        state,
-                        events=post_boundary,
-                        llm_config=llm_config,
-                        history=history,
-                    ):
-                        delete_staging_snapshot(state=state)
-                        return CondensedHistory(history, None)
-                    resolved_action = resolve_continuity_or_fallback(
-                        state, history, post_boundary, action, budget, llm_config
-                    )
-                    if resolved_action is not None:
-                        await self._notify_compaction_started(compaction_start_emitter)
-                        action = resolved_action
-                        action.summary = strip_verbatim_user_echo(
-                            action.summary or '', state=state
-                        )
-                        finalize_compaction_artifacts(state=state)
-                        mark_just_compacted(state)
-                        record_boundary_compact(
-                            state,
-                            history,
-                            action,
-                            llm_config=llm_config,
-                            post_events=self._projected_post_boundary(
-                                history, action, state
-                            ),
-                        )
-                        logger.info(
-                            'ContextPipeline used pre-warmed compaction in %.3fs',
-                            time.perf_counter() - started,
-                        )
-                        return CondensedHistory([], action)
+        prewarmed_result = await self._try_apply_prewarmed_compaction(
+            state,
+            history,
+            post_boundary,
+            llm_config,
+            started,
+            compaction_start_emitter,
+            turn_signals,
+        )
+        if prewarmed_result is not None:
+            return prewarmed_result
 
         events = post_boundary
         budget = ContextBudget.from_events(
@@ -272,6 +304,95 @@ class ContextPipeline:
             delete_staging_snapshot(state=state)
             return CondensedHistory(history, None)
 
+        return await self._run_compaction(
+            state,
+            history,
+            events,
+            budget,
+            llm_config,
+            explicit,
+            started,
+            compaction_start_emitter,
+        )
+
+    @staticmethod
+    def _discard_stale_prewarm(turn_signals: Any, history: list[Event]) -> None:
+        logger.warning(
+            'Discarding stale pre-warmed compaction '
+            '(prewarm_len=%s current_len=%d prewarm_latest_id=%s current_latest_id=%s)',
+            getattr(turn_signals, 'prewarm_history_len', None),
+            len(history),
+            getattr(turn_signals, 'prewarm_latest_event_id', None),
+            getattr(history[-1], 'id', None) if history else None,
+        )
+        clear_prewarm_signals(turn_signals)
+
+    @staticmethod
+    def _valid_prewarmed_action(prewarmed: Compaction) -> CondensationAction | None:
+        action = prewarmed.action
+        if isinstance(action, CondensationAction) and (action.summary or '').strip():
+            return action
+        return None
+
+    async def _try_apply_prewarmed_compaction(
+        self,
+        state: State,
+        history: list[Event],
+        post_boundary: list[Event],
+        llm_config: Any,
+        started: float,
+        compaction_start_emitter: Any | None,
+        turn_signals: Any,
+    ) -> CondensedHistory | None:
+        prewarmed = getattr(turn_signals, 'prewarmed_compaction', None)
+        if not isinstance(prewarmed, Compaction):
+            return None
+        if is_prewarm_stale(history, turn_signals):
+            self._discard_stale_prewarm(turn_signals, history)
+            return None
+        clear_prewarm_signals(turn_signals)
+        action = self._valid_prewarmed_action(prewarmed)
+        if action is None:
+            return None
+        budget = ContextBudget.from_events(
+            post_boundary,
+            llm_config=llm_config,
+            state=state,
+        )
+        if should_skip_compaction(
+            state,
+            events=post_boundary,
+            llm_config=llm_config,
+            history=history,
+        ):
+            delete_staging_snapshot(state=state)
+            return CondensedHistory(history, None)
+        resolved_action = resolve_continuity_or_fallback(
+            state, history, post_boundary, action, budget, llm_config
+        )
+        if resolved_action is None:
+            return None
+        await self._notify_compaction_started(compaction_start_emitter)
+        action = resolved_action
+        action.summary = strip_verbatim_user_echo(action.summary or '', state=state)
+        self._finalize_compaction_state(state, history, action, llm_config)
+        logger.info(
+            'ContextPipeline used pre-warmed compaction in %.3fs',
+            time.perf_counter() - started,
+        )
+        return CondensedHistory([], action)
+
+    async def _run_compaction(
+        self,
+        state: State,
+        history: list[Event],
+        events: list[Event],
+        budget: ContextBudget,
+        llm_config: Any,
+        explicit: bool,
+        started: float,
+        compaction_start_emitter: Any | None,
+    ) -> CondensedHistory:
         await self._notify_compaction_started(compaction_start_emitter)
         action = await self._compaction_engine.run(
             state,
@@ -301,15 +422,7 @@ class ContextPipeline:
         if action.summary:
             action.summary = strip_verbatim_user_echo(action.summary, state=state)
 
-        finalize_compaction_artifacts(state=state)
-        mark_just_compacted(state)
-        record_boundary_compact(
-            state,
-            history,
-            action,
-            llm_config=llm_config,
-            post_events=self._projected_post_boundary(history, action, state),
-        )
+        self._finalize_compaction_state(state, history, action, llm_config)
         from backend.context.canonical_state.ops import (
             merge_compaction_summary_into_canonical,
         )
@@ -323,6 +436,23 @@ class ContextPipeline:
             time.perf_counter() - started,
         )
         return CondensedHistory([], action)
+
+    def _finalize_compaction_state(
+        self,
+        state: State,
+        history: list[Event],
+        action: CondensationAction,
+        llm_config: Any,
+    ) -> None:
+        finalize_compaction_artifacts(state=state)
+        mark_just_compacted(state)
+        record_boundary_compact(
+            state,
+            history,
+            action,
+            llm_config=llm_config,
+            post_events=self._projected_post_boundary(history, action, state),
+        )
 
     @staticmethod
     async def _notify_compaction_started(emitter: Any | None) -> None:
@@ -367,19 +497,7 @@ class ContextPipeline:
         )
         events = _drop_stale_prompt_state_artifacts(events)
 
-        just_compacted = False
-        if state is not None:
-            pipe = getattr(state, 'extra_data', {}).get('context_pipeline_state', {})
-            just_compacted = (
-                bool(pipe.get(_JUST_COMPACTED_KEY)) if isinstance(pipe, dict) else False
-            )
-            if just_compacted:
-                pipe = dict(pipe) if isinstance(pipe, dict) else {}
-                pipe[_JUST_COMPACTED_KEY] = False
-                state.set_extra(
-                    'context_pipeline_state', pipe, source='ContextPipeline'
-                )
-
+        just_compacted = _consume_just_compacted(state)
         packet = build_context_packet_observation(
             events,
             history,
@@ -397,38 +515,8 @@ class ContextPipeline:
             emergency_only=True,
             tool_budget_applied=True,
         )
-        if (
-            window.windowed
-            and window.original_events >= DEFAULT_EMERGENCY_PROMPT_MIN_EVENTS
-            and window.selected_events < DEFAULT_EMERGENCY_PROMPT_MIN_EVENTS
-        ):
-            logger.warning(
-                'Emergency prompt window would collapse to %d/%d events; '
-                'returning unwindowed prompt and marking critical memory pressure',
-                window.selected_events,
-                window.original_events,
-            )
-            if state is not None and hasattr(state, 'set_memory_pressure'):
-                try:
-                    state.set_memory_pressure('CRITICAL', source='ContextPipeline')
-                except Exception:
-                    logger.debug(
-                        'Failed to mark emergency memory pressure', exc_info=True
-                    )
-            return PromptWindowResult(
-                events=events,
-                original_events=window.original_events,
-                selected_events=len(events),
-                dropped_events=max(0, window.original_events - len(events)),
-                estimated_tokens=window.estimated_tokens,
-                selected_estimated_tokens=window.estimated_tokens,
-                token_budget=window.token_budget,
-                protected_events=0,
-                windowed=False,
-                reason='emergency_window_rejected',
-                cache_fingerprint=prompt_events_fingerprint(events),
-            )
-        return window
+        rejected = _reject_collapsed_prompt_window(window, events, state)
+        return rejected if rejected is not None else window
 
     async def prewarm_compaction(self, state: State) -> Compaction | None:
         """Run LLM compaction off the hot path for foreground reuse."""
@@ -538,24 +626,10 @@ class ContextPipeline:
         bind_session_context(state=state)
         try:
             snapshot = extract_snapshot(history)
-            runtime: dict[str, object] = {}
-            session_id = getattr(state, 'session_id', None)
-            if isinstance(session_id, str) and session_id:
-                runtime['session_id'] = session_id
-            iteration_flag = getattr(state, 'iteration_flag', None)
-            current = getattr(iteration_flag, 'current_value', None)
-            if isinstance(current, int):
-                runtime['iteration'] = current
+            runtime = _runtime_snapshot_metadata(state)
             if runtime:
                 snapshot['runtime'] = runtime
-            if (
-                snapshot.get('files_touched')
-                or snapshot.get('recent_errors')
-                or snapshot.get('decisions')
-                or snapshot.get('user_messages')
-                or snapshot.get('test_results')
-                or snapshot.get('background_tasks')
-            ):
+            if _snapshot_has_extracted_context(snapshot):
                 save_snapshot(snapshot, state=state)
         except Exception:
             logger.debug('Pre-condensation snapshot extraction failed', exc_info=True)

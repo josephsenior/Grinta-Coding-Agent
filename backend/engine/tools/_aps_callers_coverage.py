@@ -12,6 +12,7 @@ from __future__ import annotations
 import os
 import re
 import shutil
+from typing import Any
 
 from backend.engine.tools._aps_shared import _diag, _run_command
 from backend.engine.tools.ignore_filter import (
@@ -109,27 +110,21 @@ def _callers_lines_via_walk(
     return lines, count
 
 
-def _build_callers_action(symbol: str, scope: str) -> str:
-    """Find all files that reference a given symbol (function, class, variable)."""
-    from backend.utils.impact_analysis import analyze_symbol_impact
-
-    safe_scope = scope if scope and scope != '.' else '.'
-    report = analyze_symbol_impact(safe_scope, symbol)
-
-    if report is None or report.total_references == 0:
-        trunc_sym = f'{symbol[:40]}…' if len(symbol) > 40 else symbol
-        return _diag(
-            reason=f'no references found for symbol {trunc_sym!r}',
-            command='callers',
-            params={'symbol': symbol, 'path': scope},
-            next_steps=[
-                'Verify the symbol name is spelled exactly as in source.',
-                'Try command=semantic_search for AST-aware matching.',
-                'Broaden the search by passing path=. (workspace root).',
-            ],
-        )
-
+def _callers_no_references_diag(symbol: str, scope: str) -> str:
     trunc_sym = f'{symbol[:40]}…' if len(symbol) > 40 else symbol
+    return _diag(
+        reason=f'no references found for symbol {trunc_sym!r}',
+        command='callers',
+        params={'symbol': symbol, 'path': scope},
+        next_steps=[
+            'Verify the symbol name is spelled exactly as in source.',
+            'Try command=semantic_search for AST-aware matching.',
+            'Broaden the search by passing path=. (workspace root).',
+        ],
+    )
+
+
+def _render_callers_report(report: Any, trunc_sym: str) -> str:
     out = [
         f'=== REFERENCES TO {trunc_sym} ===',
         f'Engine: {report.engine.upper()}',
@@ -152,3 +147,17 @@ def _build_callers_action(symbol: str, scope: str) -> str:
         out.append('  … (truncated)')
 
     return '\n'.join(out)
+
+
+def _build_callers_action(symbol: str, scope: str) -> str:
+    """Find all files that reference a given symbol (function, class, variable)."""
+    from backend.utils.impact_analysis import analyze_symbol_impact
+
+    safe_scope = scope if scope and scope != '.' else '.'
+    report = analyze_symbol_impact(safe_scope, symbol)
+
+    if report is None or report.total_references == 0:
+        return _callers_no_references_diag(symbol, scope)
+
+    trunc_sym = f'{symbol[:40]}…' if len(symbol) > 40 else symbol
+    return _render_callers_report(report, trunc_sym)

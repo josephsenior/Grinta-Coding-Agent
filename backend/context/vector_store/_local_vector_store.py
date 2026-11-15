@@ -395,6 +395,45 @@ class SQLiteBM25Backend(VectorBackend):
             logger.warning("SQLite FTS search failed for query '%s': %s", query, e)
             return []
 
+    def _delete_indexed_rows(
+        self,
+        conn: sqlite3.Connection,
+        indexed_sql: str,
+        indexed_params: list[Any],
+    ) -> int:
+        cursor = conn.execute(
+            f'DELETE FROM docs WHERE rowid IN '
+            f'(SELECT rowid FROM docs_meta AS meta WHERE 1=1 {indexed_sql})',
+            indexed_params,
+        )
+        deleted = cursor.rowcount
+        conn.commit()
+        return deleted
+
+    def _rows_matching_metadata(
+        self,
+        conn: sqlite3.Connection,
+        filter_metadata: dict[str, Any],
+        indexed_sql: str,
+        indexed_params: list[Any],
+    ) -> list[int]:
+        if indexed_sql:
+            cursor = conn.execute(
+                f'SELECT docs.rowid, docs.metadata FROM docs '
+                f'JOIN docs_meta AS meta ON meta.rowid = docs.rowid '
+                f'WHERE 1=1 {indexed_sql}',
+                indexed_params,
+            )
+        else:
+            cursor = conn.execute('SELECT rowid, metadata FROM docs')
+
+        ids_to_delete: list[int] = []
+        for rowid, meta_json in cursor:
+            meta = self._load_row_metadata(meta_json)
+            if self._metadata_matches_filter(meta, filter_metadata):
+                ids_to_delete.append(rowid)
+        return ids_to_delete
+
     def delete_by_metadata(self, filter_metadata: dict[str, Any]) -> int:
         """Delete documents whose stored metadata matches all filter criteria.
 
@@ -414,32 +453,14 @@ class SQLiteBM25Backend(VectorBackend):
         }
 
         if indexed_sql and not residual:
-            # Pure indexed path: single DELETE statement, no Python scan.
-            cursor = conn.execute(
-                f'DELETE FROM docs WHERE rowid IN '
-                f'(SELECT rowid FROM docs_meta AS meta WHERE 1=1 {indexed_sql})',
-                indexed_params,
-            )
-            deleted = cursor.rowcount
-            conn.commit()
-            return deleted
+            return self._delete_indexed_rows(conn, indexed_sql, indexed_params)
 
-        # Mixed path: indexed pre-filter to bound the Python scan.
-        if indexed_sql:
-            cursor = conn.execute(
-                f'SELECT docs.rowid, docs.metadata FROM docs '
-                f'JOIN docs_meta AS meta ON meta.rowid = docs.rowid '
-                f'WHERE 1=1 {indexed_sql}',
-                indexed_params,
-            )
-        else:
-            cursor = conn.execute('SELECT rowid, metadata FROM docs')
-
-        ids_to_delete: list[int] = []
-        for rowid, meta_json in cursor:
-            meta = self._load_row_metadata(meta_json)
-            if self._metadata_matches_filter(meta, filter_metadata):
-                ids_to_delete.append(rowid)
+        ids_to_delete = self._rows_matching_metadata(
+            conn,
+            filter_metadata,
+            indexed_sql,
+            indexed_params,
+        )
 
         if not ids_to_delete:
             return 0

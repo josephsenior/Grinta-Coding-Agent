@@ -18,6 +18,85 @@ from backend.cli.theme import NAVY_TEXT_DIM, NAVY_TEXT_MUTED
 from backend.cli.tool_display.preview import mcp_result_user_preview
 
 
+def _mcp_collection_length(payload: Any) -> int | None:
+    if isinstance(payload, list):
+        return len(payload)
+    if not isinstance(payload, dict):
+        return None
+    for key in ('results', 'items', 'documents', 'matches'):
+        value = payload.get(key)
+        if isinstance(value, list):
+            return len(value)
+    return None
+
+
+def _mcp_nested_collection_count(payload: Any) -> int:
+    if isinstance(payload, list):
+        return len(payload)
+    if not isinstance(payload, dict):
+        return 0
+    total = 0
+    for key in ('results', 'items', 'documents', 'matches'):
+        value = payload.get(key)
+        if isinstance(value, list):
+            total += len(value)
+    return total
+
+
+def _mcp_text_block_count(block: Any) -> int:
+    if not isinstance(block, dict):
+        return 0
+    raw = block.get('text')
+    if not isinstance(raw, str) or not raw.strip():
+        return 0
+    inner = raw.strip()
+    if not (inner.startswith('{') or inner.startswith('[')):
+        return 0
+    try:
+        parsed = json.loads(inner)
+    except json.JSONDecodeError:
+        return 0
+    return _mcp_nested_collection_count(parsed)
+
+
+def _mcp_args_preview(arguments: dict | None) -> str:
+    if not arguments:
+        return ''
+    args_preview = ', '.join(
+        f'{k}={repr(v)[:30]}' for k, v in list(arguments.items())[:2]
+    )
+    if len(args_preview) > 60:
+        args_preview = args_preview[:57] + '...'
+    return f'({args_preview})' if args_preview else ''
+
+
+def _mcp_tool_secondary(
+    result: str | None,
+    success: bool | None,
+    error: str | None,
+) -> tuple[str | None, str]:
+    if error:
+        return 'failed', 'err'
+    if result:
+        preview = mcp_result_user_preview(result)
+        secondary = (preview[:80] if preview else 'completed') or 'completed'
+        return secondary, 'ok' if success is not False else 'err'
+    if success is True:
+        return 'completed', 'ok'
+    return None, 'neutral'
+
+
+def _web_fetch_card_detail(arguments: dict[str, Any] | None) -> str:
+    urls = (arguments or {}).get('urls') or []
+    if isinstance(urls, str):
+        urls = [urls] if urls.strip() else []
+    if len(urls) == 1:
+        return str(urls[0])[:80]
+    if urls:
+        return f'{len(urls)} URLs'
+    return 'web pages'
+
+
 class _McpMixin:
     @staticmethod
     def resolve_native_web_tool_kind(mcp_name: str) -> str | None:
@@ -38,39 +117,15 @@ class _McpMixin:
     @staticmethod
     def _count_collection_in_mcp_content(content: str) -> int:
         payload = _McpMixin._coerce_mcp_result_payload(content)
-        if isinstance(payload, list):
-            return len(payload)
+        count = _mcp_collection_length(payload)
+        if count is not None:
+            return count
         if not isinstance(payload, dict):
             return 0
-        for key in ('results', 'items', 'documents', 'matches'):
-            value = payload.get(key)
-            if isinstance(value, list):
-                return len(value)
         blocks = payload.get('content')
         if not isinstance(blocks, list):
             return 0
-        total = 0
-        for block in blocks:
-            if not isinstance(block, dict):
-                continue
-            raw = block.get('text')
-            if not isinstance(raw, str) or not raw.strip():
-                continue
-            inner = raw.strip()
-            if not (inner.startswith('{') or inner.startswith('[')):
-                continue
-            try:
-                parsed = json.loads(inner)
-            except json.JSONDecodeError:
-                continue
-            if isinstance(parsed, list):
-                total += len(parsed)
-            elif isinstance(parsed, dict):
-                for key in ('results', 'items', 'documents', 'matches'):
-                    value = parsed.get(key)
-                    if isinstance(value, list):
-                        total += len(value)
-        return total
+        return sum(_mcp_text_block_count(block) for block in blocks)
 
     @staticmethod
     def _build_mcp_extra_lines_from_content(content: str) -> list[ActivityLine]:
@@ -190,15 +245,7 @@ class _McpMixin:
         error: str | None = None,
     ) -> ActivityCard:
         badge_category, title, verb = _WEB_CARD_PRESETS['web_fetch']
-        urls = (arguments or {}).get('urls') or []
-        if isinstance(urls, str):
-            urls = [urls] if urls.strip() else []
-        if len(urls) == 1:
-            detail = str(urls[0])[:80]
-        elif urls:
-            detail = f'{len(urls)} URLs'
-        else:
-            detail = 'web pages'
+        detail = _web_fetch_card_detail(arguments)
         secondary, secondary_kind = _McpMixin._web_tool_secondary(
             'web_fetch',
             result or '',
@@ -259,27 +306,8 @@ class _McpMixin:
         error: str | None = None,
     ) -> ActivityCard:
         """Create an activity card for an MCP tool call."""
-        args_str = ''
-        if arguments:
-            args_preview = ', '.join(
-                f'{k}={repr(v)[:30]}' for k, v in list(arguments.items())[:2]
-            )
-            if len(args_preview) > 60:
-                args_preview = args_preview[:57] + '...'
-            args_str = f'({args_preview})' if args_preview else ''
-
-        secondary = None
-        secondary_kind = 'neutral'
-        if error:
-            secondary = 'failed'
-            secondary_kind = 'err'
-        elif result:
-            preview = mcp_result_user_preview(result)
-            secondary = (preview[:80] if preview else 'completed') or 'completed'
-            secondary_kind = 'ok' if success is not False else 'err'
-        elif success is True:
-            secondary = 'completed'
-            secondary_kind = 'ok'
+        args_str = _mcp_args_preview(arguments)
+        secondary, secondary_kind = _mcp_tool_secondary(result, success, error)
 
         extra_lines = _McpMixin._build_mcp_extra_lines_from_content(
             result or error or ''

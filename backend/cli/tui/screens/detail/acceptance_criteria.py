@@ -57,7 +57,7 @@ class AcceptanceCriteriaDetailScreen(DetailScreen):
         self._status_message = (status_message or '').strip()
         self._fallback_body = (fallback_body or '').strip()
 
-    def build_content(self) -> list:
+    def _build_meta_widgets(self) -> list:
         widgets: list = []
 
         meta_parts: list[str] = []
@@ -83,12 +83,18 @@ class AcceptanceCriteriaDetailScreen(DetailScreen):
                     widget_id='criteria-status',
                 )
             )
+        return widgets
 
-        rows = [
+    def _build_criteria_rows(self) -> list:
+        return [
             format_criterion_line(item)
             for item in self._criteria_list
             if format_criterion_line(item)
         ]
+
+    def build_content(self) -> list:
+        widgets = self._build_meta_widgets()
+        rows = self._build_criteria_rows()
         if rows:
             widgets.extend(
                 self.section(

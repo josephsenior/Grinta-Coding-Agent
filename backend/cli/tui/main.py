@@ -30,6 +30,44 @@ if TYPE_CHECKING:
     from backend.core.config import AppConfig
 
 
+def _sanitize_paste_event(event: Any) -> tuple[Any, bool]:
+    from textual import events as _events
+
+    from backend.cli.terminal_sanitize import (
+        looks_like_terminal_leak_fragment,
+        sanitize_prompt_input_text,
+    )
+
+    if not isinstance(event, _events.Paste) or not looks_like_terminal_leak_fragment(
+        event.text or ''
+    ):
+        return event, False
+    cleaned = sanitize_prompt_input_text(event.text or '')
+    if not cleaned:
+        return event, True
+    if cleaned != event.text:
+        event = _events.Paste(cleaned)
+    return event, False
+
+
+def _forward_paste_to_input(app: Any, event: Any) -> bool:
+    from textual import events as _events
+
+    if (
+        not isinstance(event, _events.Paste)
+        or event.is_forwarded
+        or app.focused is not None
+    ):
+        return False
+    try:
+        textarea = app.screen.query_one('#input')
+        if event.text:
+            textarea.insert(event.text)
+        return True
+    except Exception:
+        return False
+
+
 class GrintaTUIApp(App):
     """Top-level Textual application shell."""
 
@@ -81,37 +119,15 @@ class GrintaTUIApp(App):
         )
 
     async def on_event(self, event: Any) -> None:
-        from textual import events as _events
-
-        from backend.cli.terminal_sanitize import (
-            looks_like_terminal_leak_fragment,
-            sanitize_prompt_input_text,
-        )
-
-        if isinstance(event, _events.Paste) and looks_like_terminal_leak_fragment(
-            event.text or ''
-        ):
-            cleaned = sanitize_prompt_input_text(event.text or '')
-            if not cleaned:
-                return
-            if cleaned != event.text:
-                event = _events.Paste(cleaned)
+        event, drop_event = _sanitize_paste_event(event)
+        if drop_event:
+            return
         # When self.focused is None (e.g., focus lost on Alt+Tab), Textual's
         # default handler forwards the Paste event to the Screen, which has no
         # _on_paste handler — the event is silently dropped. Route the paste
         # text directly to the input TextArea via its public ``insert`` API.
-        if (
-            isinstance(event, _events.Paste)
-            and not event.is_forwarded
-            and self.focused is None
-        ):
-            try:
-                textarea = self.screen.query_one('#input')
-                if event.text:
-                    textarea.insert(event.text)
-                return
-            except Exception:
-                pass
+        if _forward_paste_to_input(self, event):
+            return
         await super().on_event(event)
 
     def compose(self):

@@ -24,6 +24,39 @@ from backend.core.config import AppConfig, load_app_config
 from backend.integrations.mcp.native_backends import is_user_visible_mcp_server
 
 
+def _manual_mcp_server_configs(raw_servers: Any) -> list[Any]:
+    from backend.core.config.mcp_config import MCPServerConfig
+
+    if isinstance(raw_servers, dict):
+        raw_servers = [raw_servers]
+    servers: list[MCPServerConfig] = []
+    for row in raw_servers or []:
+        if not isinstance(row, dict):
+            continue
+        name = row.get('name')
+        if not name or name == 'default':
+            continue
+        servers.append(MCPServerConfig(**{**row, 'name': name}))
+    return servers
+
+
+def _load_manual_mcp_config() -> Any:
+    from backend.cli.settings.storage import _load_raw_settings
+    from backend.core.config.mcp_config import MCPConfig
+
+    data = _load_raw_settings()
+    mcp_cfg = data.get('mcp_config') or {}
+    if not isinstance(mcp_cfg, dict):
+        mcp_cfg = {}
+    return MCPConfig(
+        enabled=bool(mcp_cfg.get('enabled', True)),
+        servers=_manual_mcp_server_configs(mcp_cfg.get('servers', [])),
+        mcp_exposed_name_reserved=frozenset(
+            mcp_cfg.get('mcp_exposed_name_reserved', []) or []
+        ),
+    )
+
+
 class GrintaManageMCPDialog(ModalDialog[bool]):
     """List, add, edit, and remove MCP servers.
 
@@ -183,32 +216,9 @@ class GrintaManageMCPDialog(ModalDialog[bool]):
         bus with source ``"manual"`` so the runtime picks it up.
         """
         try:
-            from backend.cli.settings.storage import _load_raw_settings
-            from backend.core.config.mcp_config import MCPConfig, MCPServerConfig
             from backend.integrations.mcp.config_bus import get_mcp_config_bus
 
-            data = _load_raw_settings()
-            mcp_cfg = data.get('mcp_config') or {}
-            if not isinstance(mcp_cfg, dict):
-                mcp_cfg = {}
-            raw_servers = mcp_cfg.get('servers', [])
-            if isinstance(raw_servers, dict):
-                raw_servers = [raw_servers]
-            servers: list[MCPServerConfig] = []
-            for row in raw_servers or []:
-                if not isinstance(row, dict):
-                    continue
-                name = row.get('name')
-                if not name or name == 'default':
-                    continue
-                servers.append(MCPServerConfig(**{**row, 'name': name}))
-            new_config = MCPConfig(
-                enabled=bool(mcp_cfg.get('enabled', True)),
-                servers=servers,
-                mcp_exposed_name_reserved=frozenset(
-                    mcp_cfg.get('mcp_exposed_name_reserved', []) or []
-                ),
-            )
+            new_config = _load_manual_mcp_config()
             get_mcp_config_bus().emit(new_config, source='manual')
             self._set_feedback('Reload requested.')
         except Exception as exc:
@@ -283,6 +293,24 @@ class GrintaManageMCPDialog(ModalDialog[bool]):
         self._set_feedback(f'Removed {name}.')
 
 
+def _format_added_servers(added: list[Any]) -> str:
+    if not added:
+        return ''
+    return '+ ' + ', '.join(s.name for s in added)
+
+
+def _format_removed_servers(removed: list[Any]) -> str:
+    if not removed:
+        return ''
+    return '- ' + ', '.join(s.name for s in removed)
+
+
+def _format_changed_servers(changed: dict[Any, Any]) -> str:
+    if not changed:
+        return ''
+    return '~ ' + ', '.join(old.name for old, _ in changed.values())
+
+
 def _format_change_summary(change: Any) -> str:
     """Render a one-line human summary of a bus change.
 
@@ -296,13 +324,15 @@ def _format_change_summary(change: Any) -> str:
     added = list(getattr(diff, 'added', []) or [])
     removed = list(getattr(diff, 'removed', []) or [])
     changed = dict(getattr(diff, 'changed', {}) or {})
-    parts: list[str] = []
-    if added:
-        parts.append('+ ' + ', '.join(s.name for s in added))
-    if removed:
-        parts.append('- ' + ', '.join(s.name for s in removed))
-    if changed:
-        parts.append('~ ' + ', '.join(old.name for old, _ in changed.values()))
+    parts = [
+        part
+        for part in (
+            _format_added_servers(added),
+            _format_removed_servers(removed),
+            _format_changed_servers(changed),
+        )
+        if part
+    ]
     if not parts:
         return ''
     return 'Reloaded: ' + ' | '.join(parts)

@@ -485,6 +485,14 @@ class LLMResponse:
         return self.to_dict()[key]
 
 
+def _stringify_openai_metadata_sequence(value: Any) -> str:
+    return ','.join(
+        item
+        for item in (_stringify_openai_metadata_value(part) for part in value)
+        if item
+    )
+
+
 def _stringify_openai_metadata_value(value: Any) -> str:
     """Normalize metadata values for OpenAI-compatible APIs.
 
@@ -499,11 +507,7 @@ def _stringify_openai_metadata_value(value: Any) -> str:
     if isinstance(value, (int, float)):
         return str(value)
     if isinstance(value, (list, tuple, set)):
-        return ','.join(
-            item
-            for item in (_stringify_openai_metadata_value(part) for part in value)
-            if item
-        )
+        return _stringify_openai_metadata_sequence(value)
     if isinstance(value, dict):
         return json.dumps(
             value,
@@ -658,16 +662,27 @@ def _normalize_cross_family_tool_messages(
     return cleaned
 
 
+def _assistant_tool_line(tool_call: Any) -> str | None:
+    if not isinstance(tool_call, dict):
+        return None
+    fn = tool_call.get('function') or {}
+    name = str(fn.get('name') or 'tool')
+    arguments = str(fn.get('arguments') or '{}')
+    return flatten_tool_call_for_history(name, arguments)
+
+
+def _assistant_tool_lines(tool_calls: Any) -> list[str]:
+    lines: list[str] = []
+    for tool_call in tool_calls or []:
+        line = _assistant_tool_line(tool_call)
+        if line is not None:
+            lines.append(line)
+    return lines
+
+
 def _normalize_assistant_tool_calls(msg: dict[str, Any]) -> dict[str, Any]:
     text = _extract_openai_message_text(msg.get('content'))
-    tool_lines: list[str] = []
-    for tc in msg.get('tool_calls', []) or []:
-        if not isinstance(tc, dict):
-            continue
-        fn = tc.get('function') or {}
-        name = str(fn.get('name') or 'tool')
-        arguments = str(fn.get('arguments') or '{}')
-        tool_lines.append(flatten_tool_call_for_history(name, arguments))
+    tool_lines = _assistant_tool_lines(msg.get('tool_calls'))
     normalized = {k: v for k, v in msg.items() if k != 'tool_calls'}
     normalized['content'] = (
         '\n'.join(part for part in [text, *tool_lines] if part)

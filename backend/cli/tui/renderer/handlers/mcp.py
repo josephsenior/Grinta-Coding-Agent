@@ -36,21 +36,56 @@ def _handle_mcp_action(orch: 'RendererEventProcessorMixin', event: MCPAction) ->
     orch._pending_exploration_meta = None
 
 
+def _handle_orient_mcp_observation(
+    orch: 'RendererEventProcessorMixin', event: MCPObservation
+) -> bool:
+    if event.name not in ORIENT_MCP_TOOL_NAMES:
+        return False
+    pending = (
+        orch._pending_mcp_card
+        if isinstance(orch._pending_mcp_card, OrientLineModel)
+        else None
+    )
+    model = mcp_observation_model(event, pending)
+    if model is not None:
+        orch._write_orient_line(model)
+    orch._pending_mcp_card = None
+    orch._pending_exploration_meta = None
+    return True
+
+
+def _resolve_pending_mcp_card(
+    orch: 'RendererEventProcessorMixin', action_id: int | None
+) -> object | None:
+    pending = orch._take_tool_card(action_id, expected_kind='mcp')
+    if pending is None and (action_id is None or action_id < 0):
+        pending = orch._pending_mcp_card
+    return pending
+
+
+def _complete_pending_mcp_card(
+    orch: 'RendererEventProcessorMixin',
+    pending: object,
+    *,
+    content: str,
+    is_error: bool,
+    meta: list[str] | None,
+) -> None:
+    pending.complete(
+        result=content,
+        success=not is_error,
+        meta_lines=meta,
+    )
+    if orch._pending_mcp_card is pending:
+        orch._pending_mcp_card = None
+    orch._pending_exploration_meta = None
+
+
 def _handle_mcp_observation(
     orch: 'RendererEventProcessorMixin', event: MCPObservation
 ) -> None:
     content = event.content or ''
-    if event.name in ORIENT_MCP_TOOL_NAMES:
-        pending = (
-            orch._pending_mcp_card
-            if isinstance(orch._pending_mcp_card, OrientLineModel)
-            else None
-        )
-        model = mcp_observation_model(event, pending)
-        if model is not None:
-            orch._write_orient_line(model)
-        orch._pending_mcp_card = None
-        orch._pending_exploration_meta = None
+    if _handle_orient_mcp_observation(orch, event):
         return
     is_error = mcp_content_is_error(content)
     card = ActivityRenderer.mcp_activity_card(
@@ -62,20 +97,17 @@ def _handle_mcp_observation(
     )
     meta = list(card.meta_lines) if card.meta_lines else None
     action_id = getattr(event, 'cause', None)
-    pending = orch._take_tool_card(action_id, expected_kind='mcp')
-    if pending is None and (action_id is None or action_id < 0):
-        pending = orch._pending_mcp_card
+    pending = _resolve_pending_mcp_card(orch, action_id)
     from backend.cli.tui.widgets.scan_line import MCPCard
 
     if isinstance(pending, MCPCard):
-        pending.complete(
-            result=content,
-            success=not is_error,
-            meta_lines=meta,
+        _complete_pending_mcp_card(
+            orch,
+            pending,
+            content=content,
+            is_error=is_error,
+            meta=meta,
         )
-        if orch._pending_mcp_card is pending:
-            orch._pending_mcp_card = None
-        orch._pending_exploration_meta = None
         return
 
     orch._append_scan_line_card(

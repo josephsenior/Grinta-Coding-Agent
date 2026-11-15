@@ -48,6 +48,19 @@ def _looks_like_session_dir(path: Path) -> bool:
     return (path / 'metadata.json').is_file() or (path / 'events').is_dir()
 
 
+def _iter_user_conversation_dirs(users_root: Path) -> list[Path]:
+    if not users_root.is_dir():
+        return []
+    discovered: list[Path] = []
+    for user_dir in users_root.iterdir():
+        if not user_dir.is_dir():
+            continue
+        conversations_root = user_dir / 'conversations'
+        if conversations_root.is_dir():
+            discovered.extend(conversations_root.iterdir())
+    return discovered
+
+
 def _iter_session_dirs(storage_root: Path) -> list[Path]:
     """Collect session directories from all supported storage layouts."""
     seen: set[str] = set()
@@ -62,15 +75,8 @@ def _iter_session_dirs(storage_root: Path) -> list[Path]:
         seen.add(key)
         discovered.append(path)
 
-    users_root = storage_root / 'users'
-    if users_root.is_dir():
-        for user_dir in users_root.iterdir():
-            if not user_dir.is_dir():
-                continue
-            conversations_root = user_dir / 'conversations'
-            if conversations_root.is_dir():
-                for entry in conversations_root.iterdir():
-                    _add(entry)
+    for entry in _iter_user_conversation_dirs(storage_root / 'users'):
+        _add(entry)
 
     sessions_root = storage_root / CONVERSATION_BASE_DIR
     if sessions_root.is_dir():
@@ -78,9 +84,7 @@ def _iter_session_dirs(storage_root: Path) -> list[Path]:
             _add(entry)
 
     for entry in storage_root.iterdir():
-        if not entry.is_dir():
-            continue
-        if entry.name in {'users', CONVERSATION_BASE_DIR}:
+        if not entry.is_dir() or entry.name in {'users', CONVERSATION_BASE_DIR}:
             continue
         _add(entry)
 

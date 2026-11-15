@@ -295,6 +295,84 @@ def _debugpy_spawn_probe(command: list[str]) -> bool:
     return debugpy_spawn_probe(command)
 
 
+def _debugpy_adapter_entry(command: list[str], debugpy_ok: bool) -> dict[str, Any]:
+    return {
+        'language': 'python',
+        'adapter': 'debugpy',
+        'available': debugpy_ok,
+        'auto_resolvable': debugpy_ok,
+        'transport': 'stdio',
+        'host': None,
+        'port': None,
+        'command': command if debugpy_ok else None,
+        'source': 'installed',
+    }
+
+
+def _find_recipe_adapters(
+    recipe: dict[str, Any],
+) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+    first_found: dict[str, Any] | None = None
+    first_supported: dict[str, Any] | None = None
+    for probe, build, transport in _recipe_candidates(recipe):
+        exe = which_normalized(probe)
+        if not exe:
+            continue
+        exe = to_native_path(exe)
+        spec = _build_adapter_spec(build, exe, transport, allocate_port=False)
+        candidate = {
+            'adapter': probe,
+            'command': spec.command,
+            'transport': transport,
+            'host': spec.host,
+            'port': spec.port,
+            'source': 'PATH',
+        }
+        if first_found is None:
+            first_found = candidate
+        if transport in _SUPPORTED_DAP_TRANSPORTS:
+            first_supported = candidate
+            break
+    return first_found, first_supported
+
+
+def _recipe_detection_entry(
+    label: str,
+    recipe: dict[str, Any],
+    first_found: dict[str, Any] | None,
+    first_supported: dict[str, Any] | None,
+) -> dict[str, Any]:
+    chosen = first_supported or first_found
+    available = chosen is not None
+    auto_resolvable = first_supported is not None
+    transport = (
+        chosen['transport']
+        if chosen is not None
+        else str(recipe.get('transport') or 'stdio')
+    )
+    adapter = chosen['adapter'] if chosen is not None else recipe['probe']
+    adapter_command = chosen['command'] if chosen is not None else None
+    unsupported_reason = ''
+    if available and not auto_resolvable:
+        unsupported_reason = (
+            f'{adapter} was found, but it uses {transport} transport; '
+            'this DAP client currently supports stdio and DAP-over-TCP '
+            'adapters only.'
+        )
+    return {
+        'language': label,
+        'adapter': adapter,
+        'available': available,
+        'auto_resolvable': auto_resolvable,
+        'transport': transport,
+        'host': chosen.get('host') if chosen is not None else None,
+        'port': chosen.get('port') if chosen is not None else None,
+        'command': adapter_command,
+        'source': 'PATH',
+        'unsupported_reason': unsupported_reason,
+    }
+
+
 def detect_debug_adapters() -> list[dict[str, Any]]:
     """Probe PATH for known DAP adapters; useful for diagnostics / UI.
 
@@ -306,71 +384,10 @@ def detect_debug_adapters() -> list[dict[str, Any]]:
     python = resolve_python_executable(None)
     command = [python, '-m', 'debugpy.adapter']
     debugpy_ok = _debugpy_available() and _debugpy_spawn_probe(command)
-    results: list[dict[str, Any]] = [
-        {
-            'language': 'python',
-            'adapter': 'debugpy',
-            'available': debugpy_ok,
-            'auto_resolvable': debugpy_ok,
-            'transport': 'stdio',
-            'host': None,
-            'port': None,
-            'command': command if debugpy_ok else None,
-            'source': 'installed',
-        }
-    ]
+    results: list[dict[str, Any]] = [_debugpy_adapter_entry(command, debugpy_ok)]
     for label, recipe in _DAP_ADAPTER_RECIPES.items():
-        first_found: dict[str, Any] | None = None
-        first_supported: dict[str, Any] | None = None
-        for probe, build, transport in _recipe_candidates(recipe):
-            exe = which_normalized(probe)
-            if not exe:
-                continue
-            exe = to_native_path(exe)
-            spec = _build_adapter_spec(build, exe, transport, allocate_port=False)
-            candidate = {
-                'adapter': probe,
-                'command': spec.command,
-                'transport': transport,
-                'host': spec.host,
-                'port': spec.port,
-                'source': 'PATH',
-            }
-            if first_found is None:
-                first_found = candidate
-            if transport in _SUPPORTED_DAP_TRANSPORTS:
-                first_supported = candidate
-                break
-
-        chosen = first_supported or first_found
-        available = chosen is not None
-        auto_resolvable = first_supported is not None
-        transport = (
-            chosen['transport']
-            if chosen is not None
-            else str(recipe.get('transport') or 'stdio')
-        )
-        adapter = chosen['adapter'] if chosen is not None else recipe['probe']
-        adapter_command = chosen['command'] if chosen is not None else None
-        unsupported_reason = ''
-        if available and not auto_resolvable:
-            unsupported_reason = (
-                f'{adapter} was found, but it uses {transport} transport; '
-                'this DAP client currently supports stdio and DAP-over-TCP '
-                'adapters only.'
-            )
+        first_found, first_supported = _find_recipe_adapters(recipe)
         results.append(
-            {
-                'language': label,
-                'adapter': adapter,
-                'available': available,
-                'auto_resolvable': auto_resolvable,
-                'transport': transport,
-                'host': chosen.get('host') if chosen is not None else None,
-                'port': chosen.get('port') if chosen is not None else None,
-                'command': adapter_command,
-                'source': 'PATH',
-                'unsupported_reason': unsupported_reason,
-            }
+            _recipe_detection_entry(label, recipe, first_found, first_supported)
         )
     return results

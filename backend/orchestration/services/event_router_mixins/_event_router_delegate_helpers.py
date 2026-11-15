@@ -140,33 +140,55 @@ def _summarize_delegate_task_tracking_action(
     return None
 
 
+def _summarize_delegate_browser_tool_action(
+    event: Action | Observation,
+) -> tuple[str, str] | None:
+    if not isinstance(event, BrowserToolAction):
+        return None
+    cmd = getattr(event, 'command', '') or 'browser'
+    params = getattr(event, 'params', None) or {}
+    url = params.get('url') if isinstance(params, dict) else None
+    if url:
+        return (
+            'running',
+            f'Browser {cmd}: {_truncate_delegate_progress(str(url), 60)}',
+        )
+    return 'running', f'Browser {cmd}'
+
+
+def _first_browse_url(browser_actions: str) -> str:
+    return next(
+        (
+            token.strip('\'")]},>')
+            for token in browser_actions.split()
+            if token.startswith(('http://', 'https://'))
+        ),
+        '',
+    )
+
+
+def _summarize_delegate_browse_interactive_action(
+    event: Action | Observation,
+) -> tuple[str, str] | None:
+    if not isinstance(event, BrowseInteractiveAction):
+        return None
+    ba = getattr(event, 'browser_actions', '') or ''
+    url = _first_browse_url(ba)
+    if url:
+        url = _truncate_delegate_progress(url, 60)
+        return 'running', f'Browsing {url}'
+    return 'running', 'Browsing…'  # type: ignore[unreachable]
+
+
 def _summarize_delegate_browser_action(
     event: Action | Observation,
 ) -> tuple[str, str] | None:
-    if isinstance(event, BrowserToolAction):
-        cmd = getattr(event, 'command', '') or 'browser'
-        params = getattr(event, 'params', None) or {}
-        url = params.get('url') if isinstance(params, dict) else None
-        if url:
-            return (
-                'running',
-                f'Browser {cmd}: {_truncate_delegate_progress(str(url), 60)}',
-            )
-        return 'running', f'Browser {cmd}'
-    if isinstance(event, BrowseInteractiveAction):
-        ba = getattr(event, 'browser_actions', '') or ''
-        url = next(
-            (
-                token.strip('\'")]},>')
-                for token in ba.split()
-                if token.startswith(('http://', 'https://'))
-            ),
-            '',
-        )
-        if url:
-            url = _truncate_delegate_progress(url, 60)
-            return 'running', f'Browsing {url}'
-        return 'running', 'Browsing…'  # type: ignore[unreachable]
+    for summarizer in (
+        _summarize_delegate_browser_tool_action,
+        _summarize_delegate_browse_interactive_action,
+    ):
+        if result := summarizer(event):
+            return result
     return None
 
 

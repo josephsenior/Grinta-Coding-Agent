@@ -348,17 +348,12 @@ def _step_sync(orch: Orchestrator, state: State) -> Action:
     )
 
 
-def _execute_llm_step(orch: Orchestrator, state: State, condensed: Any) -> Action:
-    """Core logic to prepare messages, call LLM, and return the first action."""
-    pending = _handle_pending_action_from_condensation(orch, state, condensed)
-    if pending is not None:
-        return pending
-
-    _generate_delimiter_token(orch)
-
-    initial_user_message = orch.memory_manager.get_initial_user_message(state.history)
-    _set_prompt_tier_from_recent_history(orch, state)
-
+def _build_llm_params_with_debug(
+    orch: Orchestrator,
+    state: State,
+    condensed: Any,
+    initial_user_message: Any,
+) -> dict[str, Any]:
     astep_id = (
         _prompt_role_debug.mark_astep_begin()
         if _prompt_role_debug.any_prompt_or_reasoning_debug()
@@ -378,18 +373,96 @@ def _execute_llm_step(orch: Orchestrator, state: State, condensed: Any) -> Actio
         history_event_count=len(state.history),
     )
     serialized_messages = message_serializer.serialize_messages(messages)
-    params = orch.planner.build_llm_params(serialized_messages, state, orch.tools)
+    return orch.planner.build_llm_params(serialized_messages, state, orch.tools)
+
+
+def _execute_llm_step(orch: Orchestrator, state: State, condensed: Any) -> Action:
+    """Core logic to prepare messages, call LLM, and return the first action."""
+    pending = _handle_pending_action_from_condensation(orch, state, condensed)
+    if pending is not None:
+        return pending
+
+    _generate_delimiter_token(orch)
+
+    initial_user_message = orch.memory_manager.get_initial_user_message(state.history)
+    _set_prompt_tier_from_recent_history(orch, state)
+
+    params = _build_llm_params_with_debug(
+        orch,
+        state,
+        condensed,
+        initial_user_message,
+    )
     _sync_executor_llm(orch)
 
-    try:
-        orch.executor._has_active_tasks = _has_active_tasks_in_state(state)  # type: ignore[attr-defined]
-        orch.executor._active_run_mode = _active_run_mode_for_state(orch, state)  # type: ignore[attr-defined]
-        orch.executor._state = state  # type: ignore[attr-defined]
-        result = orch.executor.execute(params, orch.event_stream)
-        orch._consecutive_invalid_protocol_outputs = 0
-    except Exception:
-        raise
+    _set_executor_step_context(orch, state)
+    result = orch.executor.execute(params, orch.event_stream)
+    orch._consecutive_invalid_protocol_outputs = 0
 
+    _ack_step_directives(state)
+    orch._last_llm_latency = result.execution_time
+
+    actions = result.actions or []
+    _reset_plain_text_streak_if_needed(orch, actions)
+    return _first_action_from_llm_result(orch, result)
+
+
+def _prepare_async_llm_params(
+    orch: Orchestrator,
+    state: State,
+    condensed: Any,
+    initial_user_message: Any,
+    astep_id: int,
+) -> dict[str, Any]:
+    """Build LLM params on the worker thread for the async step."""
+    from backend.context.memory.session_context import bind_session_context
+
+    bind_session_context(state=state)
+    prepare_started = time.perf_counter()
+    messages_started = time.perf_counter()
+    messages = orch.memory_manager.build_messages(
+        condensed_history=condensed.events,
+        initial_user_message=initial_user_message,
+        llm_config=orch.llm.config,
+        state=state,
+    )
+    messages_elapsed = time.perf_counter() - messages_started
+    _prompt_role_debug.log_prompt_roles_after_build_messages(
+        messages,
+        astep_id=astep_id,
+        condensed_event_count=len(condensed.events),
+        pending_condensation=condensed.pending_action is not None,
+        history_event_count=len(state.history),
+    )
+    serialize_started = time.perf_counter()
+    serialized_messages = message_serializer.serialize_messages(messages)
+    serialize_elapsed = time.perf_counter() - serialize_started
+    planner_started = time.perf_counter()
+    params = orch.planner.build_llm_params(serialized_messages, state, orch.tools)
+    logger.info(
+        'Orchestrator._prepare_params built params '
+        '(history_events=%d condensed_events=%d messages=%d '
+        'pending_condensation=%s build_messages=%.3fs serialize=%.3fs '
+        'planner=%.3fs elapsed=%.3fs)',
+        len(state.history),
+        len(condensed.events),
+        len(messages),
+        condensed.pending_action is not None,
+        messages_elapsed,
+        serialize_elapsed,
+        time.perf_counter() - planner_started,
+        time.perf_counter() - prepare_started,
+    )
+    return params
+
+
+def _set_executor_step_context(orch: Orchestrator, state: State) -> None:
+    orch.executor._has_active_tasks = _has_active_tasks_in_state(state)  # type: ignore[attr-defined]
+    orch.executor._active_run_mode = _active_run_mode_for_state(orch, state)  # type: ignore[attr-defined]
+    orch.executor._state = state  # type: ignore[attr-defined]
+
+
+def _ack_step_directives(state: State) -> None:
     try:
         if hasattr(state, 'ack_planning_directive'):
             state.ack_planning_directive(source='Orchestrator')
@@ -401,18 +474,17 @@ def _execute_llm_step(orch: Orchestrator, state: State, condensed: Any) -> Actio
             extra_data.pop('planning_directive', None)
             extra_data.pop('memory_pressure', None)
 
-    orch._last_llm_latency = result.execution_time
 
-    actions = result.actions or []
-    if actions:
-        current_count = _safe_plain_text_count(orch.executor)
-        if (
-            current_count > 0
-            and _should_reset_plain_text_count(actions)
-            and hasattr(orch.executor, '_consecutive_plain_text_blocks')
-        ):
-            orch.executor._consecutive_plain_text_blocks = 0  # type: ignore[attr-defined]
-    return _first_action_from_llm_result(orch, result)
+def _reset_plain_text_streak_if_needed(orch: Orchestrator, actions: list[Any]) -> None:
+    if not actions:
+        return
+    current_count = _safe_plain_text_count(orch.executor)
+    if (
+        current_count > 0
+        and _should_reset_plain_text_count(actions)
+        and hasattr(orch.executor, '_consecutive_plain_text_blocks')
+    ):
+        orch.executor._consecutive_plain_text_blocks = 0  # type: ignore[attr-defined]
 
 
 async def _execute_llm_step_async(
@@ -434,49 +506,15 @@ async def _execute_llm_step_async(
         else 0
     )
 
-    def _prepare_params() -> dict[str, Any]:
-        from backend.context.memory.session_context import bind_session_context
-
-        bind_session_context(state=state)
-        prepare_started = time.perf_counter()
-        messages_started = time.perf_counter()
-        messages = orch.memory_manager.build_messages(
-            condensed_history=condensed.events,
-            initial_user_message=initial_user_message,
-            llm_config=orch.llm.config,
-            state=state,
-        )
-        messages_elapsed = time.perf_counter() - messages_started
-        _prompt_role_debug.log_prompt_roles_after_build_messages(
-            messages,
-            astep_id=astep_id,
-            condensed_event_count=len(condensed.events),
-            pending_condensation=condensed.pending_action is not None,
-            history_event_count=len(state.history),
-        )
-        serialize_started = time.perf_counter()
-        serialized_messages = message_serializer.serialize_messages(messages)
-        serialize_elapsed = time.perf_counter() - serialize_started
-        planner_started = time.perf_counter()
-        params = orch.planner.build_llm_params(serialized_messages, state, orch.tools)
-        logger.info(
-            'Orchestrator._prepare_params built params '
-            '(history_events=%d condensed_events=%d messages=%d '
-            'pending_condensation=%s build_messages=%.3fs serialize=%.3fs '
-            'planner=%.3fs elapsed=%.3fs)',
-            len(state.history),
-            len(condensed.events),
-            len(messages),
-            condensed.pending_action is not None,
-            messages_elapsed,
-            serialize_elapsed,
-            time.perf_counter() - planner_started,
-            time.perf_counter() - prepare_started,
-        )
-        return params
-
     params_started = time.perf_counter()
-    params = await asyncio.to_thread(_prepare_params)
+    params = await asyncio.to_thread(
+        _prepare_async_llm_params,
+        orch,
+        state,
+        condensed,
+        initial_user_message,
+        astep_id,
+    )
     logger.info(
         'Orchestrator._execute_llm_step_async prepared LLM params in %.3fs',
         time.perf_counter() - params_started,
@@ -484,39 +522,18 @@ async def _execute_llm_step_async(
     _sync_executor_llm(orch)
 
     try:
-        orch.executor._has_active_tasks = _has_active_tasks_in_state(state)  # type: ignore[attr-defined]
-        orch.executor._active_run_mode = _active_run_mode_for_state(orch, state)  # type: ignore[attr-defined]
-        orch.executor._state = state  # type: ignore[attr-defined]
+        _set_executor_step_context(orch, state)
         result = await orch.executor.async_execute(params, orch.event_stream)
         orch._consecutive_invalid_protocol_outputs = 0
-    except Exception:
-        raise
     finally:
         pipeline = getattr(orch.memory_manager, '_pipeline', None)
         if pipeline is not None and hasattr(pipeline, 'note_llm_step'):
             pipeline.note_llm_step(state)
 
-    # Ensure extra_data cleanup always runs, even if async_execute raises.
-    try:
-        if hasattr(state, 'ack_planning_directive'):
-            state.ack_planning_directive(source='Orchestrator')
-        if hasattr(state, 'ack_memory_pressure'):
-            state.ack_memory_pressure(source='Orchestrator')
-    finally:
-        extra_data = getattr(state, 'extra_data', None)
-        if isinstance(extra_data, dict):
-            extra_data.pop('planning_directive', None)
-            extra_data.pop('memory_pressure', None)
+    _ack_step_directives(state)
 
     orch._last_llm_latency = result.execution_time
 
     actions = result.actions or []
-    if actions:
-        current_count = _safe_plain_text_count(orch.executor)
-        if (
-            current_count > 0
-            and _should_reset_plain_text_count(actions)
-            and hasattr(orch.executor, '_consecutive_plain_text_blocks')
-        ):
-            orch.executor._consecutive_plain_text_blocks = 0  # type: ignore[attr-defined]
+    _reset_plain_text_streak_if_needed(orch, actions)
     return _first_action_from_llm_result(orch, result)

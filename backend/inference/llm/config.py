@@ -113,52 +113,68 @@ def _apply_custom_tokenizer(config: Any) -> None:
         config.custom_tokenizer = tokenizer
 
 
+_LOG_SCALAR_KWARG_KEYS: tuple[str, ...] = (
+    'model',
+    'temperature',
+    'top_p',
+    'top_k',
+    'max_tokens',
+    'max_completion_tokens',
+    'timeout',
+    'seed',
+    'reasoning_effort',
+    'parallel_tool_calls',
+    'tool_choice',
+)
+
+
+def _logged_scalar_kwargs(call_kwargs: dict[str, Any]) -> dict[str, Any]:
+    return {
+        key: call_kwargs[key] for key in _LOG_SCALAR_KWARG_KEYS if key in call_kwargs
+    }
+
+
+def _logged_response_format(response_format: Any) -> Any:
+    if isinstance(response_format, dict):
+        return {
+            key: response_format.get(key)
+            for key in ('type', 'name')
+            if key in response_format
+        } or sorted(response_format)
+    return type(response_format).__name__
+
+
+def _logged_tool_preview(tools: list[Any]) -> dict[str, Any]:
+    names: list[str] = []
+    for tool in tools[:25]:
+        if not isinstance(tool, dict):
+            continue
+        function = tool.get('function')
+        if isinstance(function, dict) and function.get('name'):
+            names.append(str(function['name']))
+        elif tool.get('name'):
+            names.append(str(tool['name']))
+    if not names:
+        return {}
+    return {
+        'tool_names_preview': names,
+        'tool_names_truncated': len(tools) > len(names),
+    }
+
+
 def _safe_call_kwargs_for_log(call_kwargs: dict[str, Any]) -> dict[str, Any]:
     """Return compact, non-secret kwargs actually sent to the LLM client."""
-    logged: dict[str, Any] = {}
-    scalar_keys = (
-        'model',
-        'temperature',
-        'top_p',
-        'top_k',
-        'max_tokens',
-        'max_completion_tokens',
-        'timeout',
-        'seed',
-        'reasoning_effort',
-        'parallel_tool_calls',
-        'tool_choice',
-    )
-    for key in scalar_keys:
-        if key in call_kwargs:
-            logged[key] = call_kwargs[key]
+    logged = _logged_scalar_kwargs(call_kwargs)
     if 'thinking' in call_kwargs:
         logged['thinking'] = call_kwargs['thinking']
     if 'response_format' in call_kwargs:
-        response_format = call_kwargs['response_format']
-        if isinstance(response_format, dict):
-            logged['response_format'] = {
-                key: response_format.get(key)
-                for key in ('type', 'name')
-                if key in response_format
-            } or sorted(response_format)
-        else:
-            logged['response_format'] = type(response_format).__name__
+        logged['response_format'] = _logged_response_format(
+            call_kwargs['response_format']
+        )
     tools = call_kwargs.get('tools')
     if isinstance(tools, list):
         logged['tool_count'] = len(tools)
-        names: list[str] = []
-        for tool in tools[:25]:
-            if not isinstance(tool, dict):
-                continue
-            function = tool.get('function')
-            if isinstance(function, dict) and function.get('name'):
-                names.append(str(function['name']))
-            elif tool.get('name'):
-                names.append(str(tool['name']))
-        if names:
-            logged['tool_names_preview'] = names
-            logged['tool_names_truncated'] = len(tools) > len(names)
+        logged.update(_logged_tool_preview(tools))
     return logged
 
 

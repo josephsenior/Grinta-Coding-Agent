@@ -283,6 +283,24 @@ def infer_workspace_from_uv_style_launch(install_root: Path) -> Path | None:
     return None  # type: ignore[unreachable]
 
 
+def _uv_shell_ancestor_workspace(
+    pid: int,
+    install: Path,
+    saw_uv: bool,
+) -> Path | None:
+    if not saw_uv:
+        return None
+    comm = _proc_comm(pid)
+    if not _is_shell_comm(comm):
+        return None
+    cwd = _proc_cwd(pid)
+    if cwd is None or cwd == install or not cwd.is_dir():
+        return None
+    if is_reserved_user_app_data_dir(cwd):
+        return None
+    return cwd
+
+
 def _infer_workspace_from_uv_style_launch_linux(install_root: Path) -> Path | None:
     install = install_root.expanduser().resolve()
     try:
@@ -294,23 +312,40 @@ def _infer_workspace_from_uv_style_launch_linux(install_root: Path) -> Path | No
     pid = os.getppid()
     saw_uv = False
     for _ in range(12):
-        comm = _proc_comm(pid)
-        cwd = _proc_cwd(pid)
-        if _is_uv_runner_comm(comm):
+        if _is_uv_runner_comm(_proc_comm(pid)):
             saw_uv = True
-        if (
-            saw_uv
-            and _is_shell_comm(comm)
-            and cwd is not None
-            and cwd != install
-            and cwd.is_dir()
-            and not is_reserved_user_app_data_dir(cwd)
-        ):
-            return cwd
+        candidate = _uv_shell_ancestor_workspace(pid, install, saw_uv)
+        if candidate is not None:
+            return candidate
         next_pid = _proc_ppid(pid)
         if next_pid is None or next_pid <= 1:
             break
         pid = next_pid
+    return None
+
+
+def _project_dir_from_env() -> Path | None:
+    for key in ('PROJECT_ROOT', 'APP_PROJECT_ROOT'):
+        env_path = _workspace_path_from_raw(os.environ.get(key))
+        if env_path is not None:
+            return env_path
+    return None
+
+
+def _project_dir_from_invocation_hint() -> Path | None:
+    hint = os.environ.get('GRINTA_INVOCATION_CWD', '').strip()
+    if not hint:
+        return None
+    return _workspace_path_from_raw(hint)
+
+
+def _persisted_launch_project(install: Path) -> Path | None:
+    persisted = load_persisted_workspace_path()
+    if not persisted:
+        return None
+    saved = _workspace_path_from_raw(persisted)
+    if saved is not None and saved.resolve() != install:
+        return saved.resolve()
     return None
 
 
@@ -324,16 +359,13 @@ def resolve_launch_project_directory(project: str | None = None) -> Path:
     if project:
         return Path(project).expanduser().resolve()
 
-    for key in ('PROJECT_ROOT', 'APP_PROJECT_ROOT'):
-        env_path = _workspace_path_from_raw(os.environ.get(key))
-        if env_path is not None:
-            return env_path
+    env_project = _project_dir_from_env()
+    if env_project is not None:
+        return env_project
 
-    hint = os.environ.get('GRINTA_INVOCATION_CWD', '').strip()
-    if hint:
-        hinted = _workspace_path_from_raw(hint)
-        if hinted is not None:
-            return hinted
+    hinted_project = _project_dir_from_invocation_hint()
+    if hinted_project is not None:
+        return hinted_project
 
     cwd = Path.cwd().resolve()
     from backend.core.runtime_paths import resolve_grinta_repo_root
@@ -346,10 +378,8 @@ def resolve_launch_project_directory(project: str | None = None) -> Path:
     if inferred is not None:
         return inferred
 
-    persisted = load_persisted_workspace_path()
-    if persisted:
-        saved = _workspace_path_from_raw(persisted)
-        if saved is not None and saved.resolve() != install:
-            return saved.resolve()
+    persisted_project = _persisted_launch_project(install)
+    if persisted_project is not None:
+        return persisted_project
 
     return cwd

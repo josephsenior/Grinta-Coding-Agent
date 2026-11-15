@@ -84,18 +84,26 @@ def get_current_provider(config: AppConfig) -> str | None:
         return None
 
 
+def _provider_env_api_key(provider: str | None) -> str | None:
+    if not provider:
+        return None
+    try:
+        from backend.core.config.api_key_manager import api_key_manager
+
+        provider_key = api_key_manager.get_provider_key_from_env(provider)
+        if provider_key and provider_key.strip():
+            return provider_key.strip()
+    except Exception:
+        logger.debug('Could not resolve provider API key', exc_info=True)
+    return None
+
+
 def _resolve_api_key_value(
     config: AppConfig, provider: str | None = None
 ) -> str | None:
-    if provider:
-        try:
-            from backend.core.config.api_key_manager import api_key_manager
-
-            provider_key = api_key_manager.get_provider_key_from_env(provider)
-            if provider_key and provider_key.strip():
-                return provider_key.strip()
-        except Exception:
-            logger.debug('Could not resolve provider API key', exc_info=True)
+    provider_key = _provider_env_api_key(provider)
+    if provider_key:
+        return provider_key
 
     llm_cfg = config.get_llm_config()
     raw = _api_key_from_llm_cfg(llm_cfg)
@@ -182,6 +190,35 @@ def get_persisted_reasoning_effort() -> str:
     return str(raw).strip()
 
 
+def _mirror_autonomy_to_config(config: Any, target_agent: str, level: str) -> None:
+    try:
+        setattr(config, 'autonomy_level', level)
+        getter = getattr(config, 'get_agent_config', None)
+        if callable(getter):
+            try:
+                agent_config = getter(target_agent)
+            except TypeError:
+                agent_config = getter()
+            if agent_config is not None:
+                agent_config.autonomy_level = level
+    except Exception:
+        logger.debug(
+            'Could not mirror persisted autonomy onto config',
+            exc_info=True,
+        )
+
+
+def _emit_session_context_change() -> None:
+    try:
+        from backend.core.logging.session_event_logger import (
+            emit_session_context_if_changed,
+        )
+
+        emit_session_context_if_changed()
+    except Exception:
+        pass
+
+
 def sync_persisted_autonomy_to_controller(
     controller: Any,
     agent_name: str | None = None,
@@ -209,36 +246,55 @@ def sync_persisted_autonomy_to_controller(
         ac.autonomy_level = level
 
     if config is not None:
-        try:
-            setattr(config, 'autonomy_level', level)
-            getter = getattr(config, 'get_agent_config', None)
-            if callable(getter):
-                try:
-                    agent_config = getter(target_agent)
-                except TypeError:
-                    agent_config = getter()
-                if agent_config is not None:
-                    agent_config.autonomy_level = level
-        except Exception:
-            logger.debug(
-                'Could not mirror persisted autonomy onto config',
-                exc_info=True,
-            )
+        _mirror_autonomy_to_config(config, target_agent, level)
 
     from backend.cli.settings.mode_runtime import apply_autonomy_to_controller
 
     apply_autonomy_to_controller(controller)
-
-    try:
-        from backend.core.logging.session_event_logger import (
-            emit_session_context_if_changed,
-        )
-
-        emit_session_context_if_changed()
-    except Exception:
-        pass
+    _emit_session_context_change()
 
     return level
+
+
+def _mirror_interaction_mode_to_config(
+    config: Any, target_agent: str, mode: str
+) -> None:
+    if config is None:
+        return
+    try:
+        agent_config = config.get_agent_config(target_agent)
+        agent_config.mode = mode
+        setattr(config, 'mode', mode)
+    except Exception:
+        logger.debug(
+            'Could not mirror persisted interaction mode onto config',
+            exc_info=True,
+        )
+
+
+def _current_interaction_mode(
+    controller: Any,
+    agent_name: str | None,
+    config: Any | None,
+) -> str:
+    from backend.core.constants import DEFAULT_AGENT_NAME
+    from backend.core.interaction_modes import normalize_interaction_mode
+
+    agent = getattr(controller, 'agent', None)
+    running_config = getattr(agent, 'config', None) if agent is not None else None
+    if running_config is not None:
+        return normalize_interaction_mode(getattr(running_config, 'mode', None))
+    if config is not None:
+        try:
+            target = (agent_name or DEFAULT_AGENT_NAME).strip() or DEFAULT_AGENT_NAME
+            agent_config = config.get_agent_config(target)
+            return normalize_interaction_mode(getattr(agent_config, 'mode', None))
+        except Exception:
+            logger.debug(
+                'Could not read interaction mode from config during sync',
+                exc_info=True,
+            )
+    return 'agent'
 
 
 def sync_persisted_interaction_mode_to_controller(
@@ -253,55 +309,23 @@ def sync_persisted_interaction_mode_to_controller(
     """
     from backend.cli.settings.mode_runtime import apply_interaction_mode_to_controller
     from backend.core.constants import DEFAULT_AGENT_NAME
-    from backend.core.interaction_modes import normalize_interaction_mode
 
     mode = get_persisted_interaction_mode(agent_name)
     if not mode:
-        agent = getattr(controller, 'agent', None)
-        running_config = getattr(agent, 'config', None) if agent is not None else None
-        if running_config is not None:
-            return normalize_interaction_mode(getattr(running_config, 'mode', None))
-        if config is not None:
-            try:
-                target = (
-                    agent_name or DEFAULT_AGENT_NAME
-                ).strip() or DEFAULT_AGENT_NAME
-                agent_config = config.get_agent_config(target)
-                return normalize_interaction_mode(getattr(agent_config, 'mode', None))
-            except Exception:
-                logger.debug(
-                    'Could not read interaction mode from config during sync',
-                    exc_info=True,
-                )
-        return 'agent'
+        return _current_interaction_mode(controller, agent_name, config)
 
     target_agent = (agent_name or DEFAULT_AGENT_NAME).strip() or DEFAULT_AGENT_NAME
-    if config is not None:
-        try:
-            agent_config = config.get_agent_config(target_agent)
-            agent_config.mode = mode
-            setattr(config, 'mode', mode)
-        except Exception:
-            logger.debug(
-                'Could not mirror persisted interaction mode onto config',
-                exc_info=True,
-            )
-
+    _mirror_interaction_mode_to_config(config, target_agent, mode)
     apply_interaction_mode_to_controller(controller, mode)
     return mode
 
 
-def get_persisted_autonomy_level(agent_name: str | None = None) -> str:
-    """Return the user-configured autonomy level from settings.json (empty = default)."""
-    from backend.core.autonomy import (
-        _VALID_AUTONOMY_LEVELS,
-        resolve_persisted_autonomy_level,
-    )
+def _agent_setting_candidate_names(
+    agent_section: dict[str, Any],
+    agent_name: str | None,
+    field: str,
+) -> list[str]:
     from backend.core.constants import DEFAULT_AGENT_NAME
-
-    agent_section = _load_raw_settings().get('agent')
-    if not isinstance(agent_section, dict):
-        return ''
 
     candidate_names: list[str] = []
     if agent_name and agent_name.strip():
@@ -313,12 +337,27 @@ def get_persisted_autonomy_level(agent_name: str | None = None) -> str:
         if (
             isinstance(name, str)
             and isinstance(entry, dict)
-            and 'autonomy_level' in entry
+            and field in entry
             and name not in candidate_names
         ):
             candidate_names.append(name)
+    return candidate_names
 
-    for name in candidate_names:
+
+def get_persisted_autonomy_level(agent_name: str | None = None) -> str:
+    """Return the user-configured autonomy level from settings.json (empty = default)."""
+    from backend.core.autonomy import (
+        _VALID_AUTONOMY_LEVELS,
+        resolve_persisted_autonomy_level,
+    )
+
+    agent_section = _load_raw_settings().get('agent')
+    if not isinstance(agent_section, dict):
+        return ''
+
+    for name in _agent_setting_candidate_names(
+        agent_section, agent_name, 'autonomy_level'
+    ):
         entry = agent_section.get(name)
         if not isinstance(entry, dict):
             continue
@@ -357,29 +396,13 @@ def update_autonomy_level(level: str, agent_name: str | None = None) -> None:
 
 def get_persisted_interaction_mode(agent_name: str | None = None) -> str:
     """Return the user-configured interaction mode from settings.json (empty = default)."""
-    from backend.core.constants import DEFAULT_AGENT_NAME
     from backend.core.interaction_modes import normalize_interaction_mode
 
     agent_section = _load_raw_settings().get('agent')
     if not isinstance(agent_section, dict):
         return ''
 
-    candidate_names: list[str] = []
-    if agent_name and agent_name.strip():
-        candidate_names.append(agent_name.strip())
-    for fallback in (DEFAULT_AGENT_NAME, 'agent'):
-        if fallback not in candidate_names:
-            candidate_names.append(fallback)
-    for name, entry in agent_section.items():
-        if (
-            isinstance(name, str)
-            and isinstance(entry, dict)
-            and 'mode' in entry
-            and name not in candidate_names
-        ):
-            candidate_names.append(name)
-
-    for name in candidate_names:
+    for name in _agent_setting_candidate_names(agent_section, agent_name, 'mode'):
         entry = agent_section.get(name)
         if not isinstance(entry, dict):
             continue

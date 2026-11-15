@@ -270,6 +270,35 @@ class RendererThinkingMixin:
         message = intent.detail or intent.text
         self._tui.add_error(message)
 
+    def _render_checkpoint_thinking_intent(self, intent: ThinkingRenderIntent) -> None:
+        if not self._should_render_thinking_artifact(intent):
+            return
+        from backend.cli.tool_display.orient_tools import (
+            checkpoint_think_orient_model,
+        )
+
+        self._write_orient_line(
+            checkpoint_think_orient_model(
+                detail=intent.detail,
+                text=intent.text,
+                source_tool=intent.source_tool,
+            )
+        )
+
+    def _render_thinking_artifact_card(self, intent: ThinkingRenderIntent) -> None:
+        card = self._thinking_artifact_card(intent)
+        if card is None:
+            return
+        from backend.cli.event_rendering.unified_renderer import ActivityRenderer
+        from backend.cli.tui.widgets.scan_line import PayloadCard
+
+        body = (
+            ActivityRenderer.format_extra_lines(card.extra_lines or []) or intent.text
+        )
+        self._append_scan_line_card(
+            PayloadCard(card.verb, card.detail, body or intent.text)
+        )
+
     def _render_thinking_payload(
         self,
         text: str,
@@ -293,18 +322,7 @@ class RendererThinkingMixin:
             return True
 
         if intent.kind == 'checkpoint':
-            if self._should_render_thinking_artifact(intent):
-                from backend.cli.tool_display.orient_tools import (
-                    checkpoint_think_orient_model,
-                )
-
-                self._write_orient_line(
-                    checkpoint_think_orient_model(
-                        detail=intent.detail,
-                        text=intent.text,
-                        source_tool=intent.source_tool,
-                    )
-                )
+            self._render_checkpoint_thinking_intent(intent)
             return True
 
         if not self._should_render_thinking_artifact(intent):
@@ -314,18 +332,7 @@ class RendererThinkingMixin:
             self._render_error_intent(intent)
             return True
 
-        card = self._thinking_artifact_card(intent)
-        if card is not None:
-            from backend.cli.event_rendering.unified_renderer import ActivityRenderer
-            from backend.cli.tui.widgets.scan_line import PayloadCard
-
-            body = (
-                ActivityRenderer.format_extra_lines(card.extra_lines or [])
-                or intent.text
-            )
-            self._append_scan_line_card(
-                PayloadCard(card.verb, card.detail, body or intent.text)
-            )
+        self._render_thinking_artifact_card(intent)
         return True
 
     def _code_artifact_card(self, intent: ThinkingRenderIntent) -> ActivityCard:

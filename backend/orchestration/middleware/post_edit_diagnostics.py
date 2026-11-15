@@ -57,42 +57,47 @@ class PostEditDiagnosticsMiddleware(ToolInvocationMiddleware):
             return
 
         try:
-            from backend.ledger.observation import ErrorObservation
-
-            if isinstance(observation, ErrorObservation):
-                return
-
-            paths = _extract_post_edit_paths(ctx, observation)
-            if not paths:
-                return
-
-            receipts: list[LspDiagnosticReceipt] = []
-            for raw_path in paths[: self.max_files]:
-                resolved = _resolve_for_diagnostics(raw_path, ctx)
-                # LSP queries spawn a subprocess and block on I/O; run them on
-                # the sync-from-async pool so the event loop stays responsive.
-                receipt = await call_sync_from_async(
-                    _run_lsp_diagnostics,
-                    resolved,
-                    timeout_seconds=self.timeout_seconds,
-                    max_diagnostics=self.max_diagnostics,
-                    max_file_bytes=self.max_file_bytes,
-                )
-                if receipt is not None:
-                    receipts.append(receipt)
-
-            actionable = [
-                receipt
-                for receipt in receipts
-                if receipt.status != 'skipped'
-                or receipt.reason != 'not a known LSP file type'
-            ]
+            actionable = await self._actionable_receipts(ctx, observation)
             if not actionable:
                 return
 
             _append_lsp_diagnostics(observation, actionable)
         except Exception:
             logger.debug('PostEditDiagnosticsMiddleware skipped', exc_info=True)
+
+    async def _actionable_receipts(
+        self, ctx: ToolInvocationContext, observation: Observation
+    ) -> list[LspDiagnosticReceipt]:
+        from backend.ledger.observation import ErrorObservation
+
+        if isinstance(observation, ErrorObservation):
+            return []
+
+        paths = _extract_post_edit_paths(ctx, observation)
+        if not paths:
+            return []
+
+        receipts: list[LspDiagnosticReceipt] = []
+        for raw_path in paths[: self.max_files]:
+            resolved = _resolve_for_diagnostics(raw_path, ctx)
+            # LSP queries spawn a subprocess and block on I/O; run them on
+            # the sync-from-async pool so the event loop stays responsive.
+            receipt = await call_sync_from_async(
+                _run_lsp_diagnostics,
+                resolved,
+                timeout_seconds=self.timeout_seconds,
+                max_diagnostics=self.max_diagnostics,
+                max_file_bytes=self.max_file_bytes,
+            )
+            if receipt is not None:
+                receipts.append(receipt)
+
+        return [
+            receipt
+            for receipt in receipts
+            if receipt.status != 'skipped'
+            or receipt.reason != 'not a known LSP file type'
+        ]
 
 
 def _auto_lsp_diagnostics_enabled(ctx: ToolInvocationContext) -> bool:

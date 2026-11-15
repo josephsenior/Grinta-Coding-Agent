@@ -46,16 +46,19 @@ def file_uri_for_path(path_str: str) -> str | None:
     return _to_file_uri(path_str)
 
 
+def _looks_like_file_path(raw: str) -> bool:
+    if raw.startswith(('/', '\\', '.')):
+        return True
+    if len(raw) > 1 and raw[1] == ':':
+        return True
+    return '/' in raw or '\\' in raw
+
+
 def _to_file_uri(path_str: str) -> str | None:
     raw = path_str.strip().strip('\'"')
     if not raw or len(raw) > 4096 or '://' in raw:
         return None
-    if not (
-        raw.startswith(('/', '\\', '.'))
-        or (len(raw) > 1 and raw[1] == ':')
-        or '/' in raw
-        or '\\' in raw
-    ):
+    if not _looks_like_file_path(raw):
         return None
     try:
         p = Path(raw)

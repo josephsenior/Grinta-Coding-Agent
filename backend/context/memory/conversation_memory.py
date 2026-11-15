@@ -8,6 +8,7 @@ import os
 import queue
 import threading
 from collections import OrderedDict
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any, cast
 
@@ -110,6 +111,21 @@ def _compact_log_preview(value: object, *, limit: int = 300) -> str:
     if len(text) <= limit:
         return text
     return text[: limit - 3].rstrip() + '...'
+
+
+def _memory_query_from_messages(
+    messages: list[Message],
+    query_from_text: Callable[[object], str | None],
+) -> str | None:
+    for msg in messages:
+        if msg.role != 'user':
+            continue
+        for block in msg.content:
+            if is_text_content(block):
+                query = query_from_text(block.text)
+                if query:
+                    return query
+    return None
 
 
 @dataclass
@@ -819,14 +835,7 @@ class ContextMemory:
             if query:
                 return query
         if messages:
-            for msg in messages:
-                if msg.role != 'user':
-                    continue
-                for block in msg.content:
-                    if is_text_content(block):
-                        query = memory_query_from_text(block.text)
-                        if query:
-                            return query
+            return _memory_query_from_messages(messages, memory_query_from_text)
         return None
 
     def _ensure_leading_system_message(self, messages: list[Message]) -> list[Message]:

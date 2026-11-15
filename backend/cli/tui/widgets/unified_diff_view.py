@@ -70,6 +70,46 @@ def decode_diff_view_payload(content: str) -> dict[str, Any] | None:
     return payload if isinstance(payload, dict) else None
 
 
+def _hunk_context_start(
+    rows: list[DiffViewRow], first_change: int, n_context: int
+) -> int:
+    start = first_change
+    seen = 0
+    for index in range(first_change - 1, -1, -1):
+        if rows[index].kind != 'ctx':
+            break
+        seen += 1
+        start = index
+        if seen >= n_context:
+            break
+    return start
+
+
+def _hunk_context_end(rows: list[DiffViewRow], last_change: int, n_context: int) -> int:
+    end = last_change + 1
+    seen = 0
+    for index in range(last_change + 1, len(rows)):
+        if rows[index].kind != 'ctx':
+            break
+        seen += 1
+        end = index + 1
+        if seen >= n_context:
+            break
+    return end
+
+
+def _build_limited_hunk(
+    rows: list[DiffViewRow], start: int, end: int
+) -> list[DiffViewRow]:
+    result: list[DiffViewRow] = []
+    if start > 0:
+        result.append(DiffViewRow(None, None, 'hdr', '…'))
+    result.extend(rows[start:end])
+    if end < len(rows):
+        result.append(DiffViewRow(None, None, 'hdr', '…'))
+    return result
+
+
 def _limit_hunk_context(
     rows: list[DiffViewRow],
     n_context: int,
@@ -86,34 +126,9 @@ def _limit_hunk_context(
 
     first_change = change_indices[0]
     last_change = change_indices[-1]
-
-    start = first_change
-    seen = 0
-    for index in range(first_change - 1, -1, -1):
-        if rows[index].kind != 'ctx':
-            break
-        seen += 1
-        start = index
-        if seen >= n_context:
-            break
-
-    end = last_change + 1
-    seen = 0
-    for index in range(last_change + 1, len(rows)):
-        if rows[index].kind != 'ctx':
-            break
-        seen += 1
-        end = index + 1
-        if seen >= n_context:
-            break
-
-    result: list[DiffViewRow] = []
-    if start > 0:
-        result.append(DiffViewRow(None, None, 'hdr', '…'))
-    result.extend(rows[start:end])
-    if end < len(rows):
-        result.append(DiffViewRow(None, None, 'hdr', '…'))
-    return result
+    start = _hunk_context_start(rows, first_change, n_context)
+    end = _hunk_context_end(rows, last_change, n_context)
+    return _build_limited_hunk(rows, start, end)
 
 
 def _append_equal_rows(

@@ -129,6 +129,58 @@ def background_lifecycles_for_turn(executor: Any) -> dict[str, dict[str, Any]]:
     }
 
 
+def _apply_background_lifecycle(task: Any, lifecycle: dict[str, Any]) -> bool:
+    status = str(lifecycle.get('status', 'unknown'))
+    exit_code = lifecycle.get('exit_code')
+    outcome_known = bool(lifecycle.get('outcome_known'))
+    if (
+        task.status != status
+        or task.exit_code != exit_code
+        or task.outcome_known != outcome_known
+    ):
+        task.status = status
+        task.exit_code = exit_code if isinstance(exit_code, int) else None
+        task.outcome_known = outcome_known
+        task.next_action = (
+            'inspect the final terminal output before relying on this command'
+            if outcome_known
+            else task.next_action
+        )
+        return True
+    return False
+
+
+def _apply_background_task_updates(
+    tasks: Any,
+    drains: dict[str, str],
+    lifecycles: dict[str, dict[str, Any]],
+) -> bool:
+    updated = False
+    for task in tasks:
+        chunk = drains.get(task.session_id)
+        if chunk:
+            task.recent_output = chunk
+            updated = True
+        lifecycle = lifecycles.get(task.session_id)
+        if lifecycle and _apply_background_lifecycle(task, lifecycle):
+            updated = True
+    return updated
+
+
+def _store_extra_drains(
+    state: Any,
+    drains: dict[str, str],
+    known_ids: set[str],
+) -> None:
+    extra_drains = {sid: chunk for sid, chunk in drains.items() if sid not in known_ids}
+    if extra_drains:
+        state.set_extra(
+            _BACKGROUND_TURN_DRAIN_KEY,
+            extra_drains,
+            source='background_turn_sync',
+        )
+
+
 def apply_background_drain_to_state(
     state: Any,
     drains: dict[str, str],
@@ -147,39 +199,14 @@ def apply_background_drain_to_state(
     known_ids = {
         task.session_id for task in canonical.background_tasks if task.session_id
     }
-    updated = False
-    for task in canonical.background_tasks:
-        chunk = drains.get(task.session_id)
-        if chunk:
-            task.recent_output = chunk
-            updated = True
-        lifecycle = (lifecycles or {}).get(task.session_id)
-        if lifecycle:
-            status = str(lifecycle.get('status', 'unknown'))
-            exit_code = lifecycle.get('exit_code')
-            outcome_known = bool(lifecycle.get('outcome_known'))
-            if (
-                task.status != status
-                or task.exit_code != exit_code
-                or task.outcome_known != outcome_known
-            ):
-                task.status = status
-                task.exit_code = exit_code if isinstance(exit_code, int) else None
-                task.outcome_known = outcome_known
-                task.next_action = (
-                    'inspect the final terminal output before relying on this command'
-                    if outcome_known
-                    else task.next_action
-                )
-                updated = True
+    updated = _apply_background_task_updates(
+        canonical.background_tasks,
+        drains,
+        lifecycles or {},
+    )
 
-    extra_drains = {sid: chunk for sid, chunk in drains.items() if sid not in known_ids}
-    if extra_drains:
-        state.set_extra(
-            _BACKGROUND_TURN_DRAIN_KEY,
-            extra_drains,
-            source='background_turn_sync',
-        )
+    _store_extra_drains(state, drains, known_ids)
+
     if updated:
         save_canonical_state(canonical, state=state)
 

@@ -55,6 +55,23 @@ _TRIVIAL_CMD_PATTERN = re.compile(
 _CMD_SEGMENT_SEPARATOR = re.compile(r'(?:;|&&|\|\||[\r\n])+')
 
 
+def _strip_env_assignments(segment: str) -> str:
+    head = segment
+    match = re.match(r'^[A-Za-z_][A-Za-z0-9_]*=\S*\s+', head)
+    while match:
+        head = head[match.end() :]
+        match = re.match(r'^[A-Za-z_][A-Za-z0-9_]*=\S*\s+', head)
+    return head
+
+
+def _is_trivial_segment(segment: str) -> bool:
+    # Pipes and redirections can write state (for example ``tee`` or
+    # ``> file``), so keep rollback protection for those commands.
+    if '|' in segment or '>' in segment or '<' in segment:
+        return False
+    return bool(_TRIVIAL_CMD_PATTERN.match(_strip_env_assignments(segment)))
+
+
 def _is_trivial_command(command: str) -> bool:
     """Return True for read-only commands whose pre-execution checkpoint adds no value."""
     if not command:
@@ -68,18 +85,7 @@ def _is_trivial_command(command: str) -> bool:
         return False
 
     for segment in segments:
-        # Pipes and redirections can write state (for example ``tee`` or
-        # ``> file``), so keep rollback protection for those commands.
-        if '|' in segment or '>' in segment or '<' in segment:
-            return False
-
-        # Strip leading env-var assignments such as ``DEBUG=1 ls``.
-        head = segment
-        m = re.match(r'^[A-Za-z_][A-Za-z0-9_]*=\S*\s+', head)
-        while m:
-            head = head[m.end() :]
-            m = re.match(r'^[A-Za-z_][A-Za-z0-9_]*=\S*\s+', head)
-        if not _TRIVIAL_CMD_PATTERN.match(head):
+        if not _is_trivial_segment(segment):
             return False
     return True
 
@@ -167,96 +173,122 @@ class RollbackMiddleware(ToolInvocationMiddleware):
             return
 
         action_type = type(ctx.action).__name__
-        risky = action_type in _RISKY_ACTION_TYPES
-        # Also treat any action explicitly marked HIGH security risk as risky
-        # so future tool types are covered automatically (C-P0-2).
-        if not risky:
-            try:
-                from backend.core.enums import ActionSecurityRisk
-
-                if (
-                    getattr(ctx.action, 'security_risk', None)
-                    == ActionSecurityRisk.HIGH
-                ):
-                    risky = True
-            except Exception:
-                pass
-        if not risky:
+        if not self._is_risky_action(ctx.action, action_type):
             return
 
-        # Skip trivial read-only CmdRunActions to keep checkpoint history clean.
-        if action_type == 'CmdRunAction':
-            cmd_attr = getattr(ctx.action, 'command', '') or ''
-            cmd = cmd_attr if isinstance(cmd_attr, str) else ''
-            if cmd and _is_trivial_command(cmd):
-                logger.debug('Skipping checkpoint for trivial command: %s', cmd[:80])
-                return
+        if self._should_skip_trivial_checkpoint(ctx.action, action_type):
+            return
 
         manager = self._get_manager(ctx)
         if manager is None:
             return
 
         try:
-            action_type = type(ctx.action).__name__
-            description = f'auto: before {action_type}'
-            metadata: dict = {
-                'action_type': action_type,
-                'session_id': getattr(ctx.state, 'sid', 'unknown'),
-            }
-
-            # Capture the target file for FileEditAction so a future targeted
-            # shadow implementation can copy only that file rather than the
-            # whole workspace.
-            if action_type == 'FileEditAction':
-                target_file = getattr(ctx.action, 'path', None) or getattr(
-                    ctx.action, 'file_path', None
-                )
-                if target_file:
-                    metadata['target_file'] = str(target_file)
-
-            # For shell commands prefer git plumbing snapshots (branch-safe,
-            # fast, deduplicating) over full shutil copies.  For file edits
-            # git is also fine; we keep use_git=False only when git is known
-            # unavailable (handled inside create_checkpoint already).
-            use_git = action_type == 'CmdRunAction'
-
-            # System-generated transaction checkpoints are tier 1 so the CLI
-            # list can hide them from the human operator by default.
-            checkpoint_id = await asyncio.to_thread(
-                manager.create_checkpoint,
-                description=description,
-                checkpoint_type='before_risky',
-                metadata=metadata,
-                use_git=use_git,
-                tier=1,
-            )
-            ctx.metadata['rollback_checkpoint_id'] = checkpoint_id
-            ctx.metadata['rollback_available'] = True
-            try:
-                from backend.telemetry.evidence import (
-                    EvidenceKind,
-                    emit_execution_evidence,
-                )
-                from backend.telemetry.evidence.schema import Correlation
-
-                emit_execution_evidence(
-                    EvidenceKind.CHECKPOINT,
-                    {
-                        'operation': 'create',
-                        'checkpoint_id': checkpoint_id,
-                        'action_id': getattr(ctx.action, 'id', None),
-                        'reason': 'pre_mutation',
-                    },
-                    correlation=Correlation(action_id=getattr(ctx.action, 'id', None)),
-                )
-            except Exception:
-                logger.debug('Checkpoint evidence emission failed', exc_info=True)
-            logger.debug('Checkpoint %s created before %s', checkpoint_id, action_type)
+            await self._create_checkpoint(ctx, manager, action_type)
         except Exception:
             logger.debug(
                 'Checkpoint creation failed — continuing without rollback',
                 exc_info=True,
             )
+
+    @staticmethod
+    def _is_risky_action(action, action_type: str) -> bool:
+        if action_type in _RISKY_ACTION_TYPES:
+            return True
+        # Also treat any action explicitly marked HIGH security risk as risky
+        # so future tool types are covered automatically (C-P0-2).
+        try:
+            from backend.core.enums import ActionSecurityRisk
+
+            return getattr(action, 'security_risk', None) == ActionSecurityRisk.HIGH
+        except Exception:
+            return False
+
+    @staticmethod
+    def _should_skip_trivial_checkpoint(action, action_type: str) -> bool:
+        # Skip trivial read-only CmdRunActions to keep checkpoint history clean.
+        if action_type != 'CmdRunAction':
+            return False
+        cmd_attr = getattr(action, 'command', '') or ''
+        cmd = cmd_attr if isinstance(cmd_attr, str) else ''
+        if cmd and _is_trivial_command(cmd):
+            logger.debug('Skipping checkpoint for trivial command: %s', cmd[:80])
+            return True
+        return False
+
+    @staticmethod
+    def _build_checkpoint_metadata(
+        ctx: ToolInvocationContext, action_type: str
+    ) -> tuple[str, dict, bool]:
+        description = f'auto: before {action_type}'
+        metadata: dict = {
+            'action_type': action_type,
+            'session_id': getattr(ctx.state, 'sid', 'unknown'),
+        }
+
+        # Capture the target file for FileEditAction so a future targeted
+        # shadow implementation can copy only that file rather than the
+        # whole workspace.
+        if action_type == 'FileEditAction':
+            target_file = getattr(ctx.action, 'path', None) or getattr(
+                ctx.action, 'file_path', None
+            )
+            if target_file:
+                metadata['target_file'] = str(target_file)
+
+        # For shell commands prefer git plumbing snapshots (branch-safe,
+        # fast, deduplicating) over full shutil copies.  For file edits
+        # git is also fine; we keep use_git=False only when git is known
+        # unavailable (handled inside create_checkpoint already).
+        use_git = action_type == 'CmdRunAction'
+        return description, metadata, use_git
+
+    async def _create_checkpoint(
+        self,
+        ctx: ToolInvocationContext,
+        manager: RollbackManager,
+        action_type: str,
+    ) -> None:
+        description, metadata, use_git = self._build_checkpoint_metadata(
+            ctx, action_type
+        )
+
+        # System-generated transaction checkpoints are tier 1 so the CLI
+        # list can hide them from the human operator by default.
+        checkpoint_id = await asyncio.to_thread(
+            manager.create_checkpoint,
+            description=description,
+            checkpoint_type='before_risky',
+            metadata=metadata,
+            use_git=use_git,
+            tier=1,
+        )
+        ctx.metadata['rollback_checkpoint_id'] = checkpoint_id
+        ctx.metadata['rollback_available'] = True
+        self._emit_checkpoint_evidence(ctx, checkpoint_id)
+        logger.debug('Checkpoint %s created before %s', checkpoint_id, action_type)
+
+    @staticmethod
+    def _emit_checkpoint_evidence(ctx: ToolInvocationContext, checkpoint_id) -> None:
+        try:
+            from backend.telemetry.evidence import (
+                EvidenceKind,
+                emit_execution_evidence,
+            )
+            from backend.telemetry.evidence.schema import Correlation
+
+            emit_execution_evidence(
+                EvidenceKind.CHECKPOINT,
+                {
+                    'operation': 'create',
+                    'checkpoint_id': checkpoint_id,
+                    'action_id': getattr(ctx.action, 'id', None),
+                    'reason': 'pre_mutation',
+                },
+                correlation=Correlation(action_id=getattr(ctx.action, 'id', None)),
+            )
+        except Exception:
+            logger.debug('Checkpoint evidence emission failed', exc_info=True)
 
     # ------------------------------------------------------------------
     # observe stage — retroactively update audit entry with snapshot info

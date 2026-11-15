@@ -18,6 +18,7 @@ import sys
 import uuid
 from ctypes import wintypes
 from pathlib import Path
+from typing import Any
 
 from backend.core.os_capabilities import OS_CAPS
 
@@ -277,6 +278,178 @@ def _create_appcontainer(name: str) -> wintypes.LPVOID:
     return sid
 
 
+def _create_sandbox_io(workspace: Path) -> tuple[Path, Path, Any, Any, Any]:
+    workspace.mkdir(parents=True, exist_ok=True)
+    io_root = workspace / '.grinta' / 'sandbox-io'
+    io_root.mkdir(parents=True, exist_ok=True)
+    stdout_path = io_root / f'{uuid.uuid4().hex}.stdout'
+    stderr_path = io_root / f'{uuid.uuid4().hex}.stderr'
+    stdout_file = open(stdout_path, 'w+b')
+    stderr_file = open(stderr_path, 'w+b')
+    stdin_file = open('NUL', 'rb')
+    return stdout_path, stderr_path, stdout_file, stderr_file, stdin_file
+
+
+def _prepare_inheritable_handles(
+    stdout_file: Any, stderr_file: Any, stdin_file: Any
+) -> tuple[int, int, int]:
+    stdout_handle = msvcrt.get_osfhandle(stdout_file.fileno())
+    stderr_handle = msvcrt.get_osfhandle(stderr_file.fileno())
+    stdin_handle = msvcrt.get_osfhandle(stdin_file.fileno())
+    os.set_handle_inheritable(stdout_handle, True)
+    os.set_handle_inheritable(stderr_handle, True)
+    os.set_handle_inheritable(stdin_handle, True)
+    return stdout_handle, stderr_handle, stdin_handle
+
+
+def _create_attribute_list(
+    security_caps: SECURITY_CAPABILITIES,
+) -> tuple[Any, Any]:
+    size = ctypes.c_size_t(0)
+    InitializeProcThreadAttributeList(None, 1, 0, ctypes.byref(size))
+    attr_mem = ctypes.create_string_buffer(size.value)
+    attr_list = ctypes.cast(attr_mem, wintypes.LPVOID)
+    _check_bool(
+        InitializeProcThreadAttributeList(attr_list, 1, 0, ctypes.byref(size)),
+        'InitializeProcThreadAttributeList',
+    )
+    _check_bool(
+        UpdateProcThreadAttribute(
+            attr_list,
+            0,
+            PROC_THREAD_ATTRIBUTE_SECURITY_CAPABILITIES,
+            ctypes.byref(security_caps),
+            ctypes.sizeof(security_caps),
+            None,
+            None,
+        ),
+        'UpdateProcThreadAttribute',
+    )
+    return attr_mem, attr_list
+
+
+def _build_startup_info(
+    attr_list: Any, handles: tuple[int, int, int]
+) -> STARTUPINFOEXW:
+    stdout_handle, stderr_handle, stdin_handle = handles
+    startup = STARTUPINFOEXW()
+    startup.StartupInfo.cb = ctypes.sizeof(startup)
+    startup.StartupInfo.dwFlags = STARTF_USESTDHANDLES
+    startup.StartupInfo.hStdInput = wintypes.HANDLE(stdin_handle)
+    startup.StartupInfo.hStdOutput = wintypes.HANDLE(stdout_handle)
+    startup.StartupInfo.hStdError = wintypes.HANDLE(stderr_handle)
+    startup.lpAttributeList = attr_list
+    return startup
+
+
+def _run_appcontainer_process(
+    argv: list[str], cwd: str, startup: STARTUPINFOEXW
+) -> int:
+    proc_info = PROCESS_INFORMATION()
+    command_line = ctypes.create_unicode_buffer(subprocess.list2cmdline(argv))
+    _check_bool(
+        CreateProcessW(
+            None,
+            command_line,
+            None,
+            None,
+            True,
+            EXTENDED_STARTUPINFO_PRESENT,
+            None,
+            cwd,
+            ctypes.byref(startup),
+            ctypes.byref(proc_info),
+        ),
+        'CreateProcessW',
+    )
+
+    try:
+        WaitForSingleObject(proc_info.hProcess, INFINITE)
+        exit_code = wintypes.DWORD(1)
+        _check_bool(
+            GetExitCodeProcess(proc_info.hProcess, ctypes.byref(exit_code)),
+            'GetExitCodeProcess',
+        )
+    finally:
+        if proc_info.hThread:
+            CloseHandle(proc_info.hThread)
+        if proc_info.hProcess:
+            CloseHandle(proc_info.hProcess)
+    return int(exit_code.value)
+
+
+def _relay_child_output(
+    stdout_path: Path,
+    stderr_path: Path,
+    stdout_file: Any,
+    stderr_file: Any,
+) -> None:
+    stdout_file.flush()
+    stderr_file.flush()
+    sys.stdout.write(stdout_path.read_text(encoding='utf-8', errors='replace'))
+    sys.stderr.write(stderr_path.read_text(encoding='utf-8', errors='replace'))
+
+
+def _close_sandbox_files(stdout_file: Any, stderr_file: Any, stdin_file: Any) -> None:
+    stdout_file.close()
+    stderr_file.close()
+    stdin_file.close()
+
+
+def _release_attribute_list(attr_mem: Any) -> None:
+    if attr_mem is None:
+        return
+    try:
+        DeleteProcThreadAttributeList(ctypes.cast(attr_mem, wintypes.LPVOID))
+    except Exception:
+        pass
+
+
+def _release_capability_sids(capability_ptrs: list[wintypes.LPVOID], sid: Any) -> None:
+    for cap_sid in capability_ptrs:
+        if cap_sid:
+            LocalFree(cap_sid)
+    if sid:
+        LocalFree(sid)
+
+
+def _delete_appcontainer_profile(profile_name: str) -> None:
+    try:
+        DeleteAppContainerProfile(profile_name)
+    except Exception:
+        pass
+
+
+def _remove_sandbox_output(stdout_path: Path, stderr_path: Path) -> None:
+    for path in (stdout_path, stderr_path):
+        try:
+            path.unlink(missing_ok=True)
+        except Exception:
+            pass
+
+
+def _cleanup_appcontainer_launch(
+    *,
+    profile_name: str,
+    sid: Any,
+    sid_string: str,
+    capability_ptrs: list[wintypes.LPVOID],
+    attr_mem: Any,
+    workspace: Path,
+    stdout_file: Any,
+    stderr_file: Any,
+    stdin_file: Any,
+    stdout_path: Path,
+    stderr_path: Path,
+) -> None:
+    _close_sandbox_files(stdout_file, stderr_file, stdin_file)
+    _release_attribute_list(attr_mem)
+    _release_capability_sids(capability_ptrs, sid)
+    _revoke_workspace_access(workspace, sid_string)
+    _delete_appcontainer_profile(profile_name)
+    _remove_sandbox_output(stdout_path, stderr_path)
+
+
 def _launch(
     argv: list[str],
     *,
@@ -289,24 +462,13 @@ def _launch(
     sid = _create_appcontainer(profile_name)
     sid_string = _sid_to_string(sid)
     capability_ptrs: list[wintypes.LPVOID] = []
-    caps_array: ctypes.Array[SID_AND_ATTRIBUTES] | None = None
     attr_mem = None
-    workspace.mkdir(parents=True, exist_ok=True)
-    io_root = workspace / '.grinta' / 'sandbox-io'
-    io_root.mkdir(parents=True, exist_ok=True)
-    stdout_path = io_root / f'{uuid.uuid4().hex}.stdout'
-    stderr_path = io_root / f'{uuid.uuid4().hex}.stderr'
-    stdout_file = open(stdout_path, 'w+b')
-    stderr_file = open(stderr_path, 'w+b')
-    stdin_file = open('NUL', 'rb')
+    stdout_path, stderr_path, stdout_file, stderr_file, stdin_file = _create_sandbox_io(
+        workspace
+    )
 
     try:
-        stdout_handle = msvcrt.get_osfhandle(stdout_file.fileno())
-        stderr_handle = msvcrt.get_osfhandle(stderr_file.fileno())
-        stdin_handle = msvcrt.get_osfhandle(stdin_file.fileno())
-        os.set_handle_inheritable(stdout_handle, True)
-        os.set_handle_inheritable(stderr_handle, True)
-        os.set_handle_inheritable(stdin_handle, True)
+        handles = _prepare_inheritable_handles(stdout_file, stderr_file, stdin_file)
         _grant_workspace_access(workspace, sid_string, read_only=read_only_workspace)
 
         caps_array, capability_ptrs = _make_capabilities(allow_network)
@@ -320,95 +482,25 @@ def _launch(
         security_caps.CapabilityCount = len(caps_array) if caps_array is not None else 0
         security_caps.Reserved = 0
 
-        size = ctypes.c_size_t(0)
-        InitializeProcThreadAttributeList(None, 1, 0, ctypes.byref(size))
-        attr_mem = ctypes.create_string_buffer(size.value)
-        attr_list = ctypes.cast(attr_mem, wintypes.LPVOID)
-        _check_bool(
-            InitializeProcThreadAttributeList(attr_list, 1, 0, ctypes.byref(size)),
-            'InitializeProcThreadAttributeList',
-        )
-        _check_bool(
-            UpdateProcThreadAttribute(
-                attr_list,
-                0,
-                PROC_THREAD_ATTRIBUTE_SECURITY_CAPABILITIES,
-                ctypes.byref(security_caps),
-                ctypes.sizeof(security_caps),
-                None,
-                None,
-            ),
-            'UpdateProcThreadAttribute',
-        )
-
-        startup = STARTUPINFOEXW()
-        startup.StartupInfo.cb = ctypes.sizeof(startup)
-        startup.StartupInfo.dwFlags = STARTF_USESTDHANDLES
-        startup.StartupInfo.hStdInput = wintypes.HANDLE(stdin_handle)
-        startup.StartupInfo.hStdOutput = wintypes.HANDLE(stdout_handle)
-        startup.StartupInfo.hStdError = wintypes.HANDLE(stderr_handle)
-        startup.lpAttributeList = attr_list
-
-        proc_info = PROCESS_INFORMATION()
-        command_line = ctypes.create_unicode_buffer(subprocess.list2cmdline(argv))
-        _check_bool(
-            CreateProcessW(
-                None,
-                command_line,
-                None,
-                None,
-                True,
-                EXTENDED_STARTUPINFO_PRESENT,
-                None,
-                cwd,
-                ctypes.byref(startup),
-                ctypes.byref(proc_info),
-            ),
-            'CreateProcessW',
-        )
-
-        try:
-            WaitForSingleObject(proc_info.hProcess, INFINITE)
-            exit_code = wintypes.DWORD(1)
-            _check_bool(
-                GetExitCodeProcess(proc_info.hProcess, ctypes.byref(exit_code)),
-                'GetExitCodeProcess',
-            )
-        finally:
-            if proc_info.hThread:
-                CloseHandle(proc_info.hThread)
-            if proc_info.hProcess:
-                CloseHandle(proc_info.hProcess)
-
-        stdout_file.flush()
-        stderr_file.flush()
-        sys.stdout.write(stdout_path.read_text(encoding='utf-8', errors='replace'))
-        sys.stderr.write(stderr_path.read_text(encoding='utf-8', errors='replace'))
-        return int(exit_code.value)
+        attr_mem, attr_list = _create_attribute_list(security_caps)
+        startup = _build_startup_info(attr_list, handles)
+        exit_code = _run_appcontainer_process(argv, cwd, startup)
+        _relay_child_output(stdout_path, stderr_path, stdout_file, stderr_file)
+        return exit_code
     finally:
-        stdout_file.close()
-        stderr_file.close()
-        stdin_file.close()
-        if attr_mem is not None:
-            try:
-                DeleteProcThreadAttributeList(ctypes.cast(attr_mem, wintypes.LPVOID))
-            except Exception:
-                pass
-        for cap_sid in capability_ptrs:
-            if cap_sid:
-                LocalFree(cap_sid)
-        if sid:
-            LocalFree(sid)
-        _revoke_workspace_access(workspace, sid_string)
-        try:
-            DeleteAppContainerProfile(profile_name)
-        except Exception:
-            pass
-        for path in (stdout_path, stderr_path):
-            try:
-                path.unlink(missing_ok=True)
-            except Exception:
-                pass
+        _cleanup_appcontainer_launch(
+            profile_name=profile_name,
+            sid=sid,
+            sid_string=sid_string,
+            capability_ptrs=capability_ptrs,
+            attr_mem=attr_mem,
+            workspace=workspace,
+            stdout_file=stdout_file,
+            stderr_file=stderr_file,
+            stdin_file=stdin_file,
+            stdout_path=stdout_path,
+            stderr_path=stderr_path,
+        )
 
 
 def main(argv: list[str] | None = None) -> int:

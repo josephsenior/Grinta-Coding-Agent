@@ -187,42 +187,37 @@ def create_browser_tool() -> ChatCompletionToolParam:
     )
 
 
+def _copy_present_params(
+    arguments: dict[str, Any],
+    keys: tuple[str, ...],
+) -> dict[str, Any]:
+    return {key: arguments[key] for key in keys if arguments.get(key) is not None}
+
+
 def _collect_browser_params(arguments: dict[str, Any]) -> dict[str, Any]:
-    params: dict[str, Any] = {}
     bool_keys = ('new_tab', 'full_page', 'clear', 'return_state', 'inject_image')
-    for key in bool_keys:
-        if key in arguments:
-            params[key] = arguments[key]
-    str_keys = (
-        'url',
-        'text',
-        'direction',
-        'to_text',
-        'keys',
-        'wait_kind',
-        'wait_for',
-        'value',
-        'path',
-        'option_text',
-        'option_value',
-        'instruction',
-        'mode',
-    )
-    for key in str_keys:
-        val = arguments.get(key)
-        if val is not None:
-            params[key] = val
-    int_keys = ('index', 'pixels', 'scroll_index')
-    for key in int_keys:
-        val = arguments.get(key)
-        if val is not None:
-            params[key] = val
-    num_keys = ('timeout_sec', 'seconds')
-    for key in num_keys:
-        val = arguments.get(key)
-        if val is not None:
-            params[key] = val
-    if 'schema' in arguments and arguments['schema'] is not None:
+    params = {key: arguments[key] for key in bool_keys if key in arguments}
+    for keys in (
+        (
+            'url',
+            'text',
+            'direction',
+            'to_text',
+            'keys',
+            'wait_kind',
+            'wait_for',
+            'value',
+            'path',
+            'option_text',
+            'option_value',
+            'instruction',
+            'mode',
+        ),
+        ('index', 'pixels', 'scroll_index'),
+        ('timeout_sec', 'seconds'),
+    ):
+        params.update(_copy_present_params(arguments, keys))
+    if arguments.get('schema') is not None:
         params['schema'] = arguments['schema']
     return params
 

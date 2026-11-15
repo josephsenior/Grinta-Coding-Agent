@@ -524,32 +524,32 @@ def _default_interactive_shell_argv() -> list[str]:
     return ['sh', '-i']
 
 
-def _interactive_shell_argv(
+def _windows_interactive_shell_argv(
     resolved_tools: ShellToolRegistryLike,
-) -> list[str] | None:
-    """Pick a long-lived interactive shell argv from the tool registry."""
+) -> list[str]:
     import shutil
 
-    if OS_CAPS.is_windows:
-        prefer_ps = resolve_windows_powershell_preference(
-            has_bash=resolved_tools.has_bash,
-            has_powershell=resolved_tools.has_powershell,
-        )
-        if prefer_ps and resolved_tools.has_powershell:
-            shell_info = resolved_tools.get_tool_info('shell')
-            exe = shell_info.path if shell_info and shell_info.path else None
-            if exe:
-                return [exe, '-NoLogo', '-NoProfile']
-            return _default_interactive_shell_argv()
-        if resolved_tools.has_bash:
-            bash_info = resolved_tools.get_tool_info('bash')
-            exe = (
-                bash_info.path if bash_info and bash_info.path else shutil.which('bash')
-            )
-            if exe:
-                return [exe, '--norc', '--noprofile', '-i']
+    prefer_ps = resolve_windows_powershell_preference(
+        has_bash=resolved_tools.has_bash,
+        has_powershell=resolved_tools.has_powershell,
+    )
+    if prefer_ps and resolved_tools.has_powershell:
+        shell_info = resolved_tools.get_tool_info('shell')
+        exe = shell_info.path if shell_info and shell_info.path else None
+        if exe:
+            return [exe, '-NoLogo', '-NoProfile']
         return _default_interactive_shell_argv()
+    if resolved_tools.has_bash:
+        bash_info = resolved_tools.get_tool_info('bash')
+        exe = bash_info.path if bash_info and bash_info.path else shutil.which('bash')
+        if exe:
+            return [exe, '--norc', '--noprofile', '-i']
+    return _default_interactive_shell_argv()
 
+
+def _posix_interactive_shell_argv(
+    resolved_tools: ShellToolRegistryLike,
+) -> list[str] | None:
     bash_info = resolved_tools.get_tool_info('bash')
     if bash_info and bash_info.available and bash_info.path:
         return [bash_info.path, '--norc', '--noprofile', '-i']
@@ -559,6 +559,15 @@ def _interactive_shell_argv(
         if base in {'bash', 'bash.exe', 'sh', 'sh.exe', 'zsh', 'zsh.exe'}:
             return [shell_info.path, '--norc', '--noprofile', '-i']
     return None
+
+
+def _interactive_shell_argv(
+    resolved_tools: ShellToolRegistryLike,
+) -> list[str] | None:
+    """Pick a long-lived interactive shell argv from the tool registry."""
+    if OS_CAPS.is_windows:
+        return _windows_interactive_shell_argv(resolved_tools)
+    return _posix_interactive_shell_argv(resolved_tools)
 
 
 def _try_create_interactive_session(

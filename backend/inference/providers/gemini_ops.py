@@ -35,6 +35,13 @@ def _gemini_timeout_ms(timeout: float | int | None) -> int:
     return max(1, int(normalized * 1000))
 
 
+def _gemini_prompt_start(active_messages: list[dict[str, Any]]) -> int:
+    prompt_start = len(active_messages) - 1
+    while prompt_start > 0 and active_messages[prompt_start - 1].get('role') == 'user':
+        prompt_start -= 1
+    return prompt_start
+
+
 class GeminiClient(DirectLLMClient):
     """Client for Google Gemini."""
 
@@ -103,6 +110,16 @@ class GeminiClient(DirectLLMClient):
                     text_parts.append(text)
         return '\n'.join(text_parts)
 
+    def _gemini_fallback_split(
+        self, gemini_messages: list[dict[str, Any]]
+    ) -> tuple[list[dict[str, Any]], str]:
+        logger.warning(
+            'GeminiClient: no trailing user message found; falling back to last message text'
+        )
+        fallback_prompt = self._extract_gemini_text(gemini_messages[-1])
+        fallback_history = gemini_messages[:-1] if len(gemini_messages) > 1 else []
+        return fallback_history, fallback_prompt
+
     def _split_gemini_history_and_prompt(
         self, gemini_messages: list[dict[str, Any]]
     ) -> tuple[list[dict[str, Any]], str]:
@@ -114,18 +131,9 @@ class GeminiClient(DirectLLMClient):
             active_messages.pop()
 
         if not active_messages:
-            logger.warning(
-                'GeminiClient: no trailing user message found; falling back to last message text'
-            )
-            fallback_prompt = self._extract_gemini_text(gemini_messages[-1])
-            fallback_history = gemini_messages[:-1] if len(gemini_messages) > 1 else []
-            return fallback_history, fallback_prompt
+            return self._gemini_fallback_split(gemini_messages)
 
-        prompt_start = len(active_messages) - 1
-        while (
-            prompt_start > 0 and active_messages[prompt_start - 1].get('role') == 'user'
-        ):
-            prompt_start -= 1
+        prompt_start = _gemini_prompt_start(active_messages)
 
         history = active_messages[:prompt_start]
         prompt = '\n'.join(
@@ -561,36 +569,82 @@ class GeminiClient(DirectLLMClient):
             yield finish_chunk
 
 
-def _match_gemini_error(exc: Any, error_str: str, client: Any) -> Exception | None:
-    from backend.inference.exceptions import (
-        AuthenticationError,
-        InternalServerError,
-        NotFoundError,
-        ServiceUnavailableError,
-    )
+def _gemini_error_contains(error_str: str, *needles: str) -> bool:
+    return any(needle in error_str for needle in needles)
 
-    model = client.model_name
 
-    if client._is_gemini_api_key_error(error_str):
-        return AuthenticationError(str(exc), llm_provider='google', model=model)
-    if exc.code == 429 or 'quota' in error_str or 'rate limit' in error_str:
+def _gemini_auth_error(exc: Any, model: str) -> Exception:
+    from backend.inference.exceptions import AuthenticationError
+
+    return AuthenticationError(str(exc), llm_provider='google', model=model)
+
+
+def _match_gemini_rate_limit(exc: Any, error_str: str, client: Any) -> Exception | None:
+    if exc.code == 429 or _gemini_error_contains(error_str, 'quota', 'rate limit'):
         return client._map_gemini_rate_limit(exc, error_str)
-    if (
-        exc.code in (401,)
-        or 'unauthorized' in error_str
-        or 'invalid api key' in error_str
+    return None
+
+
+def _match_gemini_authentication(
+    exc: Any, error_str: str, model: str
+) -> Exception | None:
+    if exc.code in (401,) or _gemini_error_contains(
+        error_str, 'unauthorized', 'invalid api key'
     ):
-        return AuthenticationError(str(exc), llm_provider='google', model=model)
-    if exc.code == 404 or 'not found' in error_str:
+        return _gemini_auth_error(exc, model)
+    return None
+
+
+def _match_gemini_not_found(exc: Any, error_str: str, model: str) -> Exception | None:
+    if exc.code == 404 or _gemini_error_contains(error_str, 'not found'):
+        from backend.inference.exceptions import NotFoundError
+
         return NotFoundError(str(exc), llm_provider='google', model=model)
-    if (
-        exc.code in (500, 502, 503, 504)
-        or 'unavailable' in error_str
-        or 'overloaded' in error_str
+    return None
+
+
+def _match_gemini_unavailable(exc: Any, error_str: str, model: str) -> Exception | None:
+    if exc.code in (500, 502, 503, 504) or _gemini_error_contains(
+        error_str, 'unavailable', 'overloaded'
     ):
+        from backend.inference.exceptions import ServiceUnavailableError
+
         return ServiceUnavailableError(str(exc), llm_provider='google', model=model)
+    return None
+
+
+def _match_gemini_fallback(
+    exc: Any, error_str: str, client: Any, model: str
+) -> Exception | None:
     if exc.code == 400:
         return client._map_gemini_bad_request(exc, error_str)
     if exc.code and exc.code >= 500:
+        from backend.inference.exceptions import InternalServerError
+
         return InternalServerError(str(exc), llm_provider='google', model=model)
     return None
+
+
+def _match_gemini_error(exc: Any, error_str: str, client: Any) -> Exception | None:
+    model = client.model_name
+
+    if client._is_gemini_api_key_error(error_str):
+        return _gemini_auth_error(exc, model)
+
+    mapped = _match_gemini_rate_limit(exc, error_str, client)
+    if mapped is not None:
+        return mapped
+
+    mapped = _match_gemini_authentication(exc, error_str, model)
+    if mapped is not None:
+        return mapped
+
+    mapped = _match_gemini_not_found(exc, error_str, model)
+    if mapped is not None:
+        return mapped
+
+    mapped = _match_gemini_unavailable(exc, error_str, model)
+    if mapped is not None:
+        return mapped
+
+    return _match_gemini_fallback(exc, error_str, client, model)

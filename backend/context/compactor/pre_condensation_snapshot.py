@@ -369,12 +369,7 @@ def _append_user_message(event: Event, content: str, snapshot: dict) -> None:
     messages.append(item)
 
 
-def _extract_task_plan(event: Event, snapshot: dict) -> None:
-    """Capture the latest structured task tracker state.
-
-    Task tracker entries are already machine-readable, so they are a better
-    compaction source of truth than prose thoughts about what to do next.
-    """
+def _task_plan_list_from_event(event: Event) -> list | None:
     cls_name = type(event).__name__
     if cls_name == 'TaskStateObservation':
         state = getattr(event, 'state', {})
@@ -382,11 +377,14 @@ def _extract_task_plan(event: Event, snapshot: dict) -> None:
         raw_tasks = plan.get('tasks', []) if isinstance(plan, dict) else []
         setattr(event, 'task_list', raw_tasks)
     elif cls_name not in ('TaskTrackingAction', 'TaskTrackingObservation'):
-        return
+        return None
     task_list = getattr(event, 'task_list', None)
     if not isinstance(task_list, list) or not task_list:
-        return
+        return None
+    return task_list
 
+
+def _coerce_task_plan_tasks(task_list: list) -> list[dict[str, Any]]:
     tasks: list[dict[str, Any]] = []
     for raw in task_list[:_MAX_TASKS]:
         if not isinstance(raw, dict):
@@ -403,7 +401,19 @@ def _extract_task_plan(event: Event, snapshot: dict) -> None:
                 'result': str(raw.get('result', '') or '').strip()[:240],
             }
         )
+    return tasks
 
+
+def _extract_task_plan(event: Event, snapshot: dict) -> None:
+    """Capture the latest structured task tracker state.
+
+    Task tracker entries are already machine-readable, so they are a better
+    compaction source of truth than prose thoughts about what to do next.
+    """
+    task_list = _task_plan_list_from_event(event)
+    if task_list is None:
+        return
+    tasks = _coerce_task_plan_tasks(task_list)
     if not tasks:
         return
     event_id = getattr(event, 'id', None)
@@ -505,23 +515,18 @@ def _normalize_task_status(value: object) -> str:
 
 
 def _next_action_from_tasks(tasks: list[dict[str, Any]]) -> str:
-    current = next(
-        (task for task in tasks if task.get('status') == 'in_progress'),
-        None,
-    )
-    if current is None:
-        current = next((task for task in tasks if task.get('status') == 'todo'), None)
-    if current is None:
+    for status in ('in_progress', 'todo', 'blocked'):
         current = next(
-            (task for task in tasks if task.get('status') == 'blocked'),
+            (task for task in tasks if task.get('status') == status),
             None,
         )
-    if not current:
-        return ''
-    description = str(current.get('description', '')).strip()
-    if current.get('status') == 'blocked':
-        return f'Unblock task: {description}'[:240]
-    return description[:240]
+        if current is None:
+            continue
+        description = str(current.get('description', '')).strip()
+        if status == 'blocked':
+            return f'Unblock task: {description}'[:240]
+        return description[:240]
+    return ''
 
 
 def _extract_errors(event: Event, snapshot: dict) -> None:
@@ -560,42 +565,53 @@ def _extract_decisions(event: Event, snapshot: dict) -> None:
         return
 
     cls_name = type(event).__name__
-    if cls_name in ('AgentThinkAction', 'SystemHintAction', 'AgentThinkObservation'):
-        thought = str(getattr(event, 'thought', ''))
-        # Skip recovery/reflection boilerplate — only capture real decisions
-        skip_prefixes = (
-            '⚡ CONTEXT CONDENSED',
-            '🔍 SELF-REFLECTION',
-            '[SCRATCHPAD]',
-            '[SEMANTIC_RECALL',
+    if cls_name not in (
+        'AgentThinkAction',
+        'SystemHintAction',
+        'AgentThinkObservation',
+    ):
+        return
+    thought = str(getattr(event, 'thought', ''))
+    if _is_decision_candidate(event, thought):
+        snapshot['decisions'].append(thought[:_MAX_CONTENT_LENGTH])
+
+
+def _decision_should_skip(thought: str) -> bool:
+    # Skip recovery/reflection boilerplate - only capture real decisions
+    skip_prefixes = (
+        '? CONTEXT CONDENSED',
+        '?? SELF-REFLECTION',
+        '[SCRATCHPAD]',
+        '[SEMANTIC_RECALL',
+    )
+    return bool(thought) and any(thought.startswith(p) for p in skip_prefixes)
+
+
+def _is_decision_candidate(event: Event, thought: str) -> bool:
+    should_skip = _decision_should_skip(thought)
+    # #region agent log
+    if 'SELF-REFLECTION' in thought:
+        _agent_debug_log(
+            'H2_mojibake_prefix_mismatch',
+            'backend/context/pre_condensation_snapshot.py:_extract_decisions',
+            'decision-prefix-check',
+            {
+                'raw_prefix': thought[:24],
+                'raw_prefix_codepoints': [ord(ch) for ch in thought[:6]],
+                'should_skip': should_skip,
+            },
         )
-        should_skip = bool(thought) and any(
-            thought.startswith(p) for p in skip_prefixes
+    # #endregion
+    return bool(
+        thought
+        and not should_skip
+        and not _is_invalidated_assumption_text(thought)
+        and not _is_control_noise_text(thought)
+        and not _is_recoverable_tool_error_text(thought)
+        and is_durable_decision_text(
+            thought, source_tool=str(getattr(event, 'source_tool', '') or '')
         )
-        # #region agent log
-        if 'SELF-REFLECTION' in thought:
-            _agent_debug_log(
-                'H2_mojibake_prefix_mismatch',
-                'backend/context/pre_condensation_snapshot.py:_extract_decisions',
-                'decision-prefix-check',
-                {
-                    'raw_prefix': thought[:24],
-                    'raw_prefix_codepoints': [ord(ch) for ch in thought[:6]],
-                    'should_skip': should_skip,
-                },
-            )
-        # #endregion
-        if (
-            thought
-            and not should_skip
-            and not _is_invalidated_assumption_text(thought)
-            and not _is_control_noise_text(thought)
-            and not _is_recoverable_tool_error_text(thought)
-            and is_durable_decision_text(
-                thought, source_tool=str(getattr(event, 'source_tool', '') or '')
-            )
-        ):
-            snapshot['decisions'].append(thought[:_MAX_CONTENT_LENGTH])
+    )
 
 
 def is_durable_decision_text(text: str, *, source_tool: str = '') -> bool:
@@ -1110,6 +1126,18 @@ def _format_runtime_section(runtime: dict) -> list[str]:
     return lines if len(lines) > 1 else []
 
 
+def _format_task_plan_item(task: object) -> str | None:
+    if not isinstance(task, dict):
+        return None
+    status = str(task.get('status', '?') or '?')
+    desc = str(task.get('description', '') or '').strip()
+    if not desc:
+        return None
+    result = str(task.get('result', '') or '').strip()
+    suffix = f' -> {result[:120]}' if result else ''
+    return f'  - [{status}] {desc[:180]}{suffix}'
+
+
 def _format_task_plan_section(task_plan: dict) -> list[str]:
     if not isinstance(task_plan, dict) or not task_plan:
         return []
@@ -1120,16 +1148,11 @@ def _format_task_plan_section(task_plan: dict) -> list[str]:
     next_action = str(task_plan.get('next_action', '') or '').strip()
     if next_action:
         lines.append(f'  next action: {next_action[:240]}')
-    for task in tasks[:12]:
-        if not isinstance(task, dict):
-            continue
-        status = str(task.get('status', '?') or '?')
-        desc = str(task.get('description', '') or '').strip()
-        if not desc:
-            continue
-        result = str(task.get('result', '') or '').strip()
-        suffix = f' -> {result[:120]}' if result else ''
-        lines.append(f'  - [{status}] {desc[:180]}{suffix}')
+    lines.extend(
+        line
+        for task in tasks[:12]
+        if (line := _format_task_plan_item(task)) is not None
+    )
     return lines if len(lines) > 1 else []
 
 

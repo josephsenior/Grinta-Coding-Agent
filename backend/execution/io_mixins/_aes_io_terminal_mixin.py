@@ -709,6 +709,42 @@ class _AesIoTerminalMixin:
             shell_kind,
         )
 
+    def _terminal_read_offset(self, action: TerminalReadAction, mode: str) -> int:
+        if action.offset is not None:
+            return action.offset
+        if mode == 'delta':
+            return self._get_terminal_read_cursor(action.session_id)
+        return 0
+
+    def _handle_terminal_empty_read(
+        self, action: TerminalReadAction, *, mode: str, has_new_output: bool
+    ) -> ErrorObservation | None:
+        if has_new_output:
+            _reset_terminal_empty_read_streak_impl(self, action.session_id)
+            return None
+        if mode != 'delta':
+            return None
+        if TERMINAL_EMPTY_READ_CLOSE_THRESHOLD <= 0:
+            return None
+        streak = _bump_terminal_empty_read_streak_impl(self, action.session_id)
+        if streak < TERMINAL_EMPTY_READ_CLOSE_THRESHOLD:
+            return None
+        self.session_manager.close_session(action.session_id)
+        self._clear_terminal_read_cursor(action.session_id)
+        _reset_terminal_empty_read_streak_impl(self, action.session_id)
+        return ErrorObservation(
+            content=(
+                f'TERMINAL_SESSION_CLOSED: session "{action.session_id}" '
+                f'produced no new output for {streak} consecutive '
+                'terminal_read calls and was closed to prevent a ghost '
+                'session loop. Open a new terminal session or use '
+                'action='
+                'run'
+                ' for one-shot commands.'
+            ),
+            error_id='TERMINAL_EMPTY_READ_STREAK',
+        )
+
     async def terminal_read(self, action: TerminalReadAction) -> Observation:
         session = self.session_manager.get_session(action.session_id)
         if not session:
@@ -730,15 +766,7 @@ class _AesIoTerminalMixin:
                 return resize_err
 
             mode = self._terminal_mode(action.mode)
-            read_offset = (
-                action.offset
-                if action.offset is not None
-                else (
-                    self._get_terminal_read_cursor(action.session_id)
-                    if mode == 'delta'
-                    else 0
-                )
-            )
+            read_offset = self._terminal_read_offset(action, mode)
             content, next_offset, has_new_output, dropped_chars = (
                 self._read_terminal_with_mode(
                     session=session,
@@ -750,26 +778,11 @@ class _AesIoTerminalMixin:
                 action.session_id, next_offset, mode=mode
             )
             self._mark_terminal_session_interaction(action.session_id)
-            if has_new_output:
-                _reset_terminal_empty_read_streak_impl(self, action.session_id)
-            elif mode == 'delta' and TERMINAL_EMPTY_READ_CLOSE_THRESHOLD > 0:
-                streak = _bump_terminal_empty_read_streak_impl(self, action.session_id)
-                if streak >= TERMINAL_EMPTY_READ_CLOSE_THRESHOLD:
-                    self.session_manager.close_session(action.session_id)
-                    self._clear_terminal_read_cursor(action.session_id)
-                    _reset_terminal_empty_read_streak_impl(self, action.session_id)
-                    return ErrorObservation(
-                        content=(
-                            f'TERMINAL_SESSION_CLOSED: session "{action.session_id}" '
-                            f'produced no new output for {streak} consecutive '
-                            'terminal_read calls and was closed to prevent a ghost '
-                            'session loop. Open a new terminal session or use '
-                            'action='
-                            'run'
-                            ' for one-shot commands.'
-                        ),
-                        error_id='TERMINAL_EMPTY_READ_STREAK',
-                    )
+            empty_read_error = self._handle_terminal_empty_read(
+                action, mode=mode, has_new_output=has_new_output
+            )
+            if empty_read_error is not None:
+                return empty_read_error
             empty_hints = self._terminal_read_empty_hints(
                 mode=mode, has_new_output=has_new_output
             )
@@ -843,124 +856,171 @@ class _AesIoTerminalMixin:
 
         try:
             while time.monotonic() < deadline:
-                chunk, _ = _read_terminal_delta_once_impl(
-                    self,
-                    session_id=action.session_id,
-                    session=session,
+                observation = self._terminal_wait_poll_once(
+                    action, session, regex, accumulated, shell_kind
                 )
-                if chunk:
-                    accumulated.append(chunk)
-                    combined = ''.join(accumulated)
-                    if regex.search(combined):
-                        self._mark_terminal_session_interaction(action.session_id)
-                        content = combined
-                        state = 'SESSION_WAIT_MATCHED'
-                        obs = TerminalObservation(
-                            session_id=action.session_id,
-                            content=content,
-                            state=state,
-                            has_new_output=True,
-                        )
-                        obs.tool_result = {
-                            'tool': 'terminal',
-                            'ok': True,
-                            'error_code': None,
-                            'retryable': False,
-                            'state': state,
-                            'next_actions': ['read', 'input', 'close'],
-                            'payload': {
-                                'session_id': action.session_id,
-                                'shell_kind': shell_kind,
-                                'matched': True,
-                                'pattern': action.pattern,
-                            },
-                            'execution': background_session_lifecycle(session),
-                            'progress': True,
-                        }
-                        return obs
-
-                proc = getattr(session, '_process', None)
-                if proc is not None and hasattr(proc, 'poll'):
-                    exit_code = proc.poll()
-                    if exit_code is not None:
-                        chunk, _ = _read_terminal_delta_once_impl(
-                            self,
-                            session_id=action.session_id,
-                            session=session,
-                        )
-                        if chunk:
-                            accumulated.append(chunk)
-                        combined = ''.join(accumulated)
-                        content = (
-                            combined
-                            or f'Background process exited with code {exit_code}.'
-                        )
-                        state = 'SESSION_WAIT_EXITED'
-                        obs = TerminalObservation(
-                            session_id=action.session_id,
-                            content=content,
-                            state=state,
-                            has_new_output=bool(combined),
-                        )
-                        obs.tool_result = {
-                            'tool': 'terminal',
-                            'ok': False,
-                            'error_code': 'SESSION_EXITED_BEFORE_MATCH',
-                            'retryable': False,
-                            'state': state,
-                            'next_actions': ['read', 'close', 'open'],
-                            'payload': {
-                                'session_id': action.session_id,
-                                'shell_kind': shell_kind,
-                                'matched': bool(regex.search(combined)),
-                                'exit_code': int(exit_code),
-                                'pattern': action.pattern,
-                            },
-                            'execution': {
-                                'status': (
-                                    'completed' if int(exit_code) == 0 else 'failed'
-                                ),
-                                'exit_code': int(exit_code),
-                                'outcome_known': True,
-                            },
-                            'progress': False,
-                        }
-                        return obs
-
+                if observation is not None:
+                    return observation
                 await asyncio.sleep(PTY_READ_POLL_INTERVAL_SECONDS)
 
             combined = ''.join(accumulated)
-            state = 'SESSION_WAIT_TIMEOUT'
-            obs = TerminalObservation(
-                session_id=action.session_id,
-                content=(
-                    combined
-                    or f'No output matched {action.pattern!r} within {timeout}s.'
-                ),
-                state=state,
-                has_new_output=bool(combined),
+            return self._terminal_wait_timeout_observation(
+                action, session, combined, timeout, shell_kind
             )
-            obs.tool_result = {
-                'tool': 'terminal',
-                'ok': False,
-                'error_code': 'SESSION_WAIT_TIMEOUT',
-                'retryable': True,
-                'state': state,
-                'next_actions': ['read', 'wait', 'close'],
-                'payload': {
-                    'session_id': action.session_id,
-                    'shell_kind': shell_kind,
-                    'matched': False,
-                    'pattern': action.pattern,
-                    'timeout': timeout,
-                },
-                'execution': background_session_lifecycle(session),
-                'progress': bool(combined),
-            }
-            return obs
         except Exception as exc:
             logger.error('Error waiting on terminal %s: %s', action.session_id, exc)
             return ErrorObservation(f'Failed to wait on terminal: {exc}')
+
+    def _terminal_wait_poll_once(
+        self,
+        action: TerminalWaitAction,
+        session: Any,
+        regex: Any,
+        accumulated: list[str],
+        shell_kind: str,
+    ) -> Observation | None:
+        chunk, _ = _read_terminal_delta_once_impl(
+            self,
+            session_id=action.session_id,
+            session=session,
+        )
+        if chunk:
+            accumulated.append(chunk)
+            combined = ''.join(accumulated)
+            if regex.search(combined):
+                self._mark_terminal_session_interaction(action.session_id)
+                return self._terminal_wait_matched_observation(
+                    action, session, combined, shell_kind
+                )
+
+        exit_code = self._terminal_wait_exit_code(session)
+        if exit_code is not None:
+            chunk, _ = _read_terminal_delta_once_impl(
+                self,
+                session_id=action.session_id,
+                session=session,
+            )
+            if chunk:
+                accumulated.append(chunk)
+            combined = ''.join(accumulated)
+            return self._terminal_wait_exited_observation(
+                action, combined, exit_code, shell_kind, regex
+            )
+        return None
+
+    @staticmethod
+    def _terminal_wait_exit_code(session: Any) -> int | None:
+        proc = getattr(session, '_process', None)
+        if proc is None or not hasattr(proc, 'poll'):
+            return None
+        return proc.poll()
+
+    def _terminal_wait_matched_observation(
+        self,
+        action: TerminalWaitAction,
+        session: Any,
+        content: str,
+        shell_kind: str,
+    ) -> TerminalObservation:
+        state = 'SESSION_WAIT_MATCHED'
+        obs = TerminalObservation(
+            session_id=action.session_id,
+            content=content,
+            state=state,
+            has_new_output=True,
+        )
+        obs.tool_result = {
+            'tool': 'terminal',
+            'ok': True,
+            'error_code': None,
+            'retryable': False,
+            'state': state,
+            'next_actions': ['read', 'input', 'close'],
+            'payload': {
+                'session_id': action.session_id,
+                'shell_kind': shell_kind,
+                'matched': True,
+                'pattern': action.pattern,
+            },
+            'execution': background_session_lifecycle(session),
+            'progress': True,
+        }
+        return obs
+
+    def _terminal_wait_exited_observation(
+        self,
+        action: TerminalWaitAction,
+        combined: str,
+        exit_code: int,
+        shell_kind: str,
+        regex: Any,
+    ) -> TerminalObservation:
+        content = combined or f'Background process exited with code {exit_code}.'
+        state = 'SESSION_WAIT_EXITED'
+        obs = TerminalObservation(
+            session_id=action.session_id,
+            content=content,
+            state=state,
+            has_new_output=bool(combined),
+        )
+        obs.tool_result = {
+            'tool': 'terminal',
+            'ok': False,
+            'error_code': 'SESSION_EXITED_BEFORE_MATCH',
+            'retryable': False,
+            'state': state,
+            'next_actions': ['read', 'close', 'open'],
+            'payload': {
+                'session_id': action.session_id,
+                'shell_kind': shell_kind,
+                'matched': bool(regex.search(combined)),
+                'exit_code': int(exit_code),
+                'pattern': action.pattern,
+            },
+            'execution': {
+                'status': ('completed' if int(exit_code) == 0 else 'failed'),
+                'exit_code': int(exit_code),
+                'outcome_known': True,
+            },
+            'progress': False,
+        }
+        return obs
+
+    def _terminal_wait_timeout_observation(
+        self,
+        action: TerminalWaitAction,
+        session: Any,
+        combined: str,
+        timeout: int,
+        shell_kind: str,
+    ) -> TerminalObservation:
+        state = 'SESSION_WAIT_TIMEOUT'
+        obs = TerminalObservation(
+            session_id=action.session_id,
+            content=(
+                combined or f'No output matched {action.pattern!r} within {timeout}s.'
+            ),
+            state=state,
+            has_new_output=bool(combined),
+        )
+        obs.tool_result = {
+            'tool': 'terminal',
+            'ok': False,
+            'error_code': 'SESSION_WAIT_TIMEOUT',
+            'retryable': True,
+            'state': state,
+            'next_actions': ['read', 'wait', 'close'],
+            'payload': {
+                'session_id': action.session_id,
+                'shell_kind': shell_kind,
+                'matched': False,
+                'pattern': action.pattern,
+                'timeout': timeout,
+            },
+            'execution': background_session_lifecycle(session),
+            'progress': bool(combined),
+        }
+        return obs
 
     async def terminal_list(self, action: TerminalListAction) -> Observation:
         try:

@@ -141,6 +141,54 @@ def rank_entries(
     return ranked[: max(0, max_entries)]
 
 
+def _store_entries(store: dict[str, Any]) -> list[dict[str, Any]]:
+    return [
+        entry
+        for entry in (_normalize_entry(raw) for raw in store.get('entries', []))
+        if entry is not None
+    ]
+
+
+def _matching_entry(
+    entries: list[dict[str, Any]], key: str, value: str
+) -> dict[str, Any] | None:
+    for entry in entries:
+        if entry['key'].casefold() == key.casefold() or lessons_are_similar(
+            entry['value'], value
+        ):
+            return entry
+    return None
+
+
+def _timestamp() -> str:
+    return time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
+
+
+def _touch_entry(entry: dict[str, Any], value: str) -> None:
+    entry['seen_count'] = int(entry.get('seen_count', 1)) + 1
+    entry['updated'] = _timestamp()
+    entry['value'] = value
+
+
+def _new_entry(kind: str, key: str, value: str, now: str) -> dict[str, Any]:
+    return {
+        'id': uuid.uuid4().hex[:12],
+        'kind': kind,
+        'key': key,
+        'value': value,
+        'created': now,
+        'updated': now,
+        'seen_count': 1,
+    }
+
+
+def _trim_entries(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    if len(entries) <= _MAX_ENTRIES:
+        return entries
+    entries.sort(key=lambda e: (int(e.get('seen_count', 1)), str(e.get('updated', ''))))
+    return entries[-_MAX_ENTRIES:]
+
+
 def persist_entry(
     *,
     kind: str,
@@ -160,40 +208,18 @@ def persist_entry(
         kind_norm = 'lesson'
 
     store = _load_store()
-    entries = [
-        e for e in (_normalize_entry(raw) for raw in store.get('entries', [])) if e
-    ]
+    entries = _store_entries(store)
 
-    for entry in entries:
-        same_key = entry['key'].casefold() == key.casefold()
-        similar = lessons_are_similar(entry['value'], value)
-        if same_key or similar:
-            entry['seen_count'] = int(entry.get('seen_count', 1)) + 1
-            entry['updated'] = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
-            if same_key or similar:
-                entry['value'] = value
-            store['entries'] = entries
-            _save_store(store)
-            return False, f"Updated existing workspace memory '{entry['key']}'."
+    existing = _matching_entry(entries, key, value)
+    if existing is not None:
+        _touch_entry(existing, value)
+        store['entries'] = entries
+        _save_store(store)
+        return False, f"Updated existing workspace memory '{existing['key']}'."
 
-    now = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
-    entries.append(
-        {
-            'id': uuid.uuid4().hex[:12],
-            'kind': kind_norm,
-            'key': key,
-            'value': value,
-            'created': now,
-            'updated': now,
-            'seen_count': 1,
-        }
-    )
-    if len(entries) > _MAX_ENTRIES:
-        entries.sort(
-            key=lambda e: (int(e.get('seen_count', 1)), str(e.get('updated', '')))
-        )
-        entries = entries[-_MAX_ENTRIES:]
-    store['entries'] = entries
+    now = _timestamp()
+    entries.append(_new_entry(kind_norm, key, value, now))
+    store['entries'] = _trim_entries(entries)
     _save_store(store)
     return True, f"Persisted workspace memory '{key}'."
 

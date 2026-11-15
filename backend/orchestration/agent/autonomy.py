@@ -67,6 +67,21 @@ class AutonomyController:
         )
 
     @staticmethod
+    def _file_edit_signature(action: FileEditAction) -> str:
+        path = getattr(action, 'path', '') or ''
+        command = getattr(action, 'command', '') or ''
+        if not command:
+            command = 'create_file'
+        return f'{type(action).__name__}:{path}:{command}'
+
+    @staticmethod
+    def _delegate_task_signature(action: DelegateTaskAction) -> str:
+        return (
+            f'delegate:{action.run_in_background}:'
+            f'{len(action.parallel_tasks)}:{action.task_description}'
+        )
+
+    @staticmethod
     def action_signature(action: Action) -> str:
         """Stable per-session key used by the always-allow memory.
 
@@ -84,20 +99,13 @@ class AutonomyController:
         from backend.ledger.action import FileEditAction
 
         if isinstance(action, FileEditAction):
-            path = getattr(action, 'path', '') or ''
-            command = getattr(action, 'command', '') or ''
-            if not command:
-                command = 'create_file'
-            return f'{type(action).__name__}:{path}:{command}'
+            return AutonomyController._file_edit_signature(action)
         if isinstance(action, BrowserToolAction):
             return f'browser:{action.command}:{action.params}'
         if isinstance(action, BlackboardAction):
             return f'blackboard:{action.command}:{action.key}'
         if isinstance(action, DelegateTaskAction):
-            return (
-                f'delegate:{action.run_in_background}:'
-                f'{len(action.parallel_tasks)}:{action.task_description}'
-            )
+            return AutonomyController._delegate_task_signature(action)
         return type(action).__name__
 
     def remember_always_allow(self, action: Action) -> None:
@@ -160,31 +168,42 @@ class AutonomyController:
         if risk == ActionSecurityRisk.HIGH:
             return True
 
-        command = ''
+        command = self._extract_risk_command(action)
+        if command and self._command_is_high_risk(command):
+            return True
+
+        return self._is_high_risk_action_type(action)
+
+    @staticmethod
+    def _extract_risk_command(action: Action) -> str:
         if isinstance(action, CmdRunAction):
-            command = action.command
-        elif isinstance(action, TerminalRunAction):
-            command = action.command
-        elif isinstance(action, TerminalInputAction) and not action.is_control:
-            command = action.input.rstrip('\r\n')
+            return action.command
+        if isinstance(action, TerminalRunAction):
+            return action.command
+        if isinstance(action, TerminalInputAction) and not action.is_control:
+            return action.input.rstrip('\r\n')
+        return ''
 
-        if command:
-            analyzer = getattr(self, '_command_analyzer', None)
-            if analyzer is None:
-                analyzer = CommandAnalyzer({})
-                self._command_analyzer = analyzer
-            assessment = analyzer.analyze_command(command)
-            if assessment.risk_category in (
-                RiskCategory.HIGH,
-                RiskCategory.CRITICAL,
-            ):
-                logger.warning(
-                    'High-risk command detected (%s): %s',
-                    assessment.risk_category.value,
-                    command,
-                )
-                return True
+    def _command_is_high_risk(self, command: str) -> bool:
+        analyzer = getattr(self, '_command_analyzer', None)
+        if analyzer is None:
+            analyzer = CommandAnalyzer({})
+            self._command_analyzer = analyzer
+        assessment = analyzer.analyze_command(command)
+        if assessment.risk_category in (
+            RiskCategory.HIGH,
+            RiskCategory.CRITICAL,
+        ):
+            logger.warning(
+                'High-risk command detected (%s): %s',
+                assessment.risk_category.value,
+                command,
+            )
+            return True
+        return False
 
+    @staticmethod
+    def _is_high_risk_action_type(action: Action) -> bool:
         if isinstance(action, FileEditAction):
             return action.command != 'create_file'
 

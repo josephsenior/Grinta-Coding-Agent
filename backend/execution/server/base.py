@@ -782,20 +782,20 @@ class Runtime(
             return NullObservation(content='')
 
         observation = self._execute_action_sync(action)
-        if hasattr(action, 'truncation_strategy') and getattr(
-            action, 'truncation_strategy'
-        ):
-            observation.truncation_strategy = getattr(action, 'truncation_strategy')
+        self._apply_truncation_strategy(action, observation)
 
         verification_obs = self._verify_action_if_needed(action, observation)
         if verification_obs:
             return verification_obs
 
-        if hasattr(action, 'truncation_strategy') and getattr(
-            action, 'truncation_strategy'
-        ):
-            observation.truncation_strategy = getattr(action, 'truncation_strategy')
+        self._apply_truncation_strategy(action, observation)
         return observation
+
+    @staticmethod
+    def _apply_truncation_strategy(action: Action, observation: Observation) -> None:
+        strategy = getattr(action, 'truncation_strategy', None)
+        if strategy:
+            observation.truncation_strategy = strategy
 
     def _handle_special_actions(self, action: Action) -> Observation | None:
         if isinstance(action, AgentThinkAction):

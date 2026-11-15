@@ -243,6 +243,27 @@ def prep_live_response_renderable(text: str) -> Any:
     return Group(*parts)
 
 
+def _prep_streaming_prose(content: str, base_text_style: str) -> Any:
+    if base_text_style == NAVY_TEXT_PRIMARY:
+        return prep_markdown(content)
+    if '`' in content:
+        return _prep_inline_code_text(content, base_text_style=base_text_style)
+    return Text(content, style=base_text_style)
+
+
+def _prep_streaming_fence_parts(content: str, base_text_style: str) -> list[Any]:
+    raw_parts, _tail, _has_open = _split_streaming_fences(content)
+    parts: list[Any] = []
+    for segment in raw_parts:
+        if isinstance(segment, Syntax):
+            parts.append(segment)
+            continue
+        rendered = _render_streaming_segment(segment, base_text_style=base_text_style)
+        if rendered is not None:
+            parts.append(rendered)
+    return parts
+
+
 def prep_streaming_renderable(
     text: str, *, base_text_style: str = NAVY_TEXT_PRIMARY
 ) -> Any:
@@ -259,21 +280,9 @@ def prep_streaming_renderable(
 
     if '```' not in content:
         # Prose-only: full Markdown during streaming (matches finalized AgentMessage).
-        if base_text_style == NAVY_TEXT_PRIMARY:
-            return prep_markdown(content)
-        if '`' in content:
-            return _prep_inline_code_text(content, base_text_style=base_text_style)
-        return Text(content, style=base_text_style)
+        return _prep_streaming_prose(content, base_text_style)
 
-    raw_parts, _tail, _has_open = _split_streaming_fences(content)
-    parts: list[Any] = []
-    for segment in raw_parts:
-        if isinstance(segment, Syntax):
-            parts.append(segment)
-            continue
-        rendered = _render_streaming_segment(segment, base_text_style=base_text_style)
-        if rendered is not None:
-            parts.append(rendered)
+    parts = _prep_streaming_fence_parts(content, base_text_style)
 
     if not parts:
         return Text(content, style=base_text_style)

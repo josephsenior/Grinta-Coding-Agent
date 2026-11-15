@@ -49,29 +49,41 @@ def _invoke_zero_arg_callback(callback: Callable[[], object]) -> object:
     return callback()
 
 
+def _detach_deque_batch(
+    queue: object,
+    expected: list[Action],
+    popleft: Callable[[], object],
+) -> bool:
+    for exp in expected:
+        try:
+            got = popleft()
+        except Exception:
+            return False
+        if got is not exp:
+            appendleft = getattr(queue, 'appendleft', None)
+            if callable(appendleft):
+                appendleft(got)
+            return False
+    return True
+
+
+def _detach_list_batch(queue: list, expected: list[Action]) -> bool:
+    if len(queue) < len(expected):
+        return False
+    if any(queue[i] is not expected[i] for i in range(len(expected))):
+        return False
+    del queue[: len(expected)]
+    return True
+
+
 def _detach_parallel_batch(queue: object, expected: list[Action]) -> bool:
     if not expected:
         return True
     popleft = getattr(queue, 'popleft', None)
     if callable(popleft):
-        for exp in expected:
-            try:
-                got = popleft()
-            except Exception:
-                return False
-            if got is not exp:
-                appendleft = getattr(queue, 'appendleft', None)
-                if callable(appendleft):
-                    appendleft(got)
-                return False
-        return True
+        return _detach_deque_batch(queue, expected, popleft)
     if isinstance(queue, list):
-        if len(queue) < len(expected):
-            return False
-        if any(queue[i] is not expected[i] for i in range(len(expected))):
-            return False
-        del queue[: len(expected)]
-        return True
+        return _detach_list_batch(queue, expected)
     return False
 
 

@@ -575,7 +575,12 @@ class CollapsibleSection(Container):
             prefix=item.get('prefix'),
         )
 
-    def compose(self) -> ComposeResult:
+    def _compose_header(self) -> ComposeResult:
+        header_classes = (
+            'collapsible-header collapsed'
+            if self._collapsed
+            else 'collapsible-header expanded'
+        )
         with Horizontal(classes='collapsible-header-row', id='header-row'):
             yield Static(
                 self._header_icon_markup(), classes='section-icon', id='header-icon'
@@ -583,48 +588,56 @@ class CollapsibleSection(Container):
             yield Static(
                 self._header_title_markup(),
                 id='header',
-                classes=(
-                    'collapsible-header collapsed'
-                    if self._collapsed
-                    else 'collapsible-header expanded'
-                ),
+                classes=header_classes,
             )
             if self._action_label or self._feature_enabled is not None:
-                with Horizontal(classes='header-actions', id='header-actions'):
-                    if self._action_label:
-                        btn_classes = ''
-                        if self._action_button_class:
-                            btn_classes = self._action_button_class
-                        yield SidebarManageButton(
-                            self._action_label,
-                            id='action-btn',
-                            classes=btn_classes,
-                        )
-                    if self._feature_enabled is not None:
-                        yield Switch(value=self._feature_enabled, id='feature-switch')
+                yield from self._compose_header_actions()
 
+    def _compose_header_actions(self) -> ComposeResult:
+        with Horizontal(classes='header-actions', id='header-actions'):
+            if self._action_label:
+                btn_classes = self._action_button_class or ''
+                yield SidebarManageButton(
+                    self._action_label,
+                    id='action-btn',
+                    classes=btn_classes,
+                )
+            if self._feature_enabled is not None:
+                yield Switch(value=self._feature_enabled, id='feature-switch')
+
+    def _compose_items(self) -> ComposeResult:
+        for item in self._items:
+            yield self._make_row(item)
+        if self._footer_hint:
+            yield Static(
+                self._footer_hint,
+                classes='sidebar-footer-hint',
+                id='sidebar-footer-hint',
+            )
+
+    def _compose_empty_state(self) -> ComposeResult:
+        content_classes = 'empty-text'
+        if self._is_thinking:
+            content_classes += ' thinking-content'
+        yield Static(
+            self._empty_markup(self._content or ''),
+            id='empty-text',
+            classes=content_classes,
+        )
+
+    def _compose_body(self) -> ComposeResult:
         body_classes = (
             'collapsible-body -hidden' if self._collapsed else 'collapsible-body'
         )
         with Vertical(classes=body_classes, id='body'):
             if self._items:
-                for item in self._items:
-                    yield self._make_row(item)
-                if self._footer_hint:
-                    yield Static(
-                        self._footer_hint,
-                        classes='sidebar-footer-hint',
-                        id='sidebar-footer-hint',
-                    )
+                yield from self._compose_items()
             else:
-                content_classes = 'empty-text'
-                if self._is_thinking:
-                    content_classes += ' thinking-content'
-                yield Static(
-                    self._empty_markup(self._content or ''),
-                    id='empty-text',
-                    classes=content_classes,
-                )
+                yield from self._compose_empty_state()
+
+    def compose(self) -> ComposeResult:
+        yield from self._compose_header()
+        yield from self._compose_body()
 
     def toggle(self) -> None:
         """Toggle the collapsed state."""

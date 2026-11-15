@@ -190,11 +190,56 @@ class SessionEventLogger:
         q.put(flushed)
         flushed.wait(timeout=5.0)
 
+    def _drain_batch(self, q: Any, q_mod: Any, item: Any) -> list[Any]:
+        batch = [item]
+        q.task_done()
+        while not q.empty():
+            try:
+                next_item = q.get_nowait()
+            except q_mod.Empty:
+                break
+            if next_item is self._sentinel or isinstance(next_item, threading.Event):
+                q.put(next_item)
+                break
+            batch.append(next_item)
+            q.task_done()
+        return batch
+
+    def _write_batch(
+        self,
+        f: TextIO,
+        path: str,
+        batch: list[Any],
+        current_bytes: int,
+    ) -> tuple[TextIO, int]:
+        for record in batch:
+            line = self._serialize_record(record)
+            encoded_bytes = len(line.encode('utf-8')) + 1
+            if current_bytes and (
+                current_bytes + encoded_bytes > GRINTA_SESSION_LOG_MAX_BYTES
+            ):
+                f.flush()
+                f.close()
+                self._rotate_files(path)
+                f = open(path, 'a', encoding='utf-8')
+                current_bytes = 0
+            f.write(line + '\n')
+            current_bytes += encoded_bytes
+        return f, current_bytes
+
+    @staticmethod
+    def _flush_and_fsync(f: TextIO) -> None:
+        f.flush()
+        try:
+            os.fsync(f.fileno())
+        except Exception:
+            pass
+
     def _writer_loop(self, path: str, q: Any) -> None:
         import queue as q_mod
 
         try:
-            f = open(path, 'a', encoding='utf-8')
+            f: TextIO = open(path, 'a', encoding='utf-8')
             try:
                 current_bytes = os.path.getsize(path)
                 while True:
@@ -209,42 +254,10 @@ class SessionEventLogger:
                         q.task_done()
                         continue
 
-                    batch = [item]
-                    q.task_done()
-
-                    while not q.empty():
-                        try:
-                            next_item = q.get_nowait()
-                            if next_item is self._sentinel:
-                                q.put(next_item)
-                                break
-                            if isinstance(next_item, threading.Event):
-                                q.put(next_item)
-                                break
-                            batch.append(next_item)
-                            q.task_done()
-                        except q_mod.Empty:
-                            break
-
-                    for record in batch:
-                        line = self._serialize_record(record)
-                        encoded_bytes = len(line.encode('utf-8')) + 1
-                        if current_bytes and (
-                            current_bytes + encoded_bytes > GRINTA_SESSION_LOG_MAX_BYTES
-                        ):
-                            f.flush()
-                            f.close()
-                            self._rotate_files(path)
-                            f = open(path, 'a', encoding='utf-8')
-                            current_bytes = 0
-                        f.write(line + '\n')
-                        current_bytes += encoded_bytes
+                    batch = self._drain_batch(q, q_mod, item)
+                    f, current_bytes = self._write_batch(f, path, batch, current_bytes)
                     f.flush()
-                f.flush()
-                try:
-                    os.fsync(f.fileno())
-                except Exception:
-                    pass
+                self._flush_and_fsync(f)
             finally:
                 f.close()
         except Exception:
@@ -439,16 +452,10 @@ class SessionEventLogHandler(logging.Handler):
         super().__init__()
         self.mcp_server = mcp_server
 
-    def emit(self, record: logging.LogRecord) -> None:
-        if not LOG_TO_FILE or not _SESSION_LOGGER.is_bound:
-            return
-        message = record.getMessage()
-        if is_noise_message(message):
-            return
-
-        msg_type = getattr(record, 'msg_type', None)
-        level = record.levelname
+    @staticmethod
+    def _runtime_payload(record: logging.LogRecord, message: str) -> dict[str, Any]:
         payload: dict[str, Any] = {'message': message}
+        msg_type = getattr(record, 'msg_type', None)
         if msg_type:
             payload['msg_type'] = msg_type
         for key in (
@@ -464,7 +471,25 @@ class SessionEventLogHandler(logging.Handler):
             val = getattr(record, key, None)
             if val is not None:
                 payload[key] = val
+        return payload
 
+    @staticmethod
+    def _with_exception_details(
+        payload: dict[str, Any], record: logging.LogRecord
+    ) -> dict[str, Any]:
+        if record.exc_info and record.exc_info[1]:
+            payload['exc_type'] = type(record.exc_info[1]).__name__
+            payload['exc_message'] = str(record.exc_info[1])
+        return payload
+
+    def emit(self, record: logging.LogRecord) -> None:
+        if not LOG_TO_FILE or not _SESSION_LOGGER.is_bound:
+            return
+        message = record.getMessage()
+        if is_noise_message(message):
+            return
+
+        level = record.levelname
         if self.mcp_server:
             emit_session_event(
                 'MCP',
@@ -473,11 +498,11 @@ class SessionEventLogHandler(logging.Handler):
             )
             return
 
+        payload = self._runtime_payload(record, message)
         if level in {'WARNING', 'ERROR', 'CRITICAL'}:
-            if record.exc_info and record.exc_info[1]:
-                payload['exc_type'] = type(record.exc_info[1]).__name__
-                payload['exc_message'] = str(record.exc_info[1])
-            emit_session_event('ISSUE', payload, level=level)
+            emit_session_event(
+                'ISSUE', self._with_exception_details(payload, record), level=level
+            )
             return
 
         if not _RUNTIME_DEBUG and level == 'DEBUG':

@@ -134,6 +134,36 @@ def _run_install(cmd: Sequence[str]) -> bool:
     return False
 
 
+def _install_tmux_with_package_manager(
+    pm: str, libtmux_ok: bool
+) -> HostToolInstallResult:
+    attempted = False
+    for cmd in _install_command_variants(pm):
+        if cmd[0] == 'sudo' and cmd[1] != '-n' and not _interactive_install_allowed():
+            continue
+        attempted = True
+        logger.info('Installing tmux via: %s', ' '.join(cmd))
+        if _run_install(cmd) and shutil.which('tmux'):
+            logger.info('tmux installed successfully.')
+            return HostToolInstallResult(
+                tmux_installed=True,
+                libtmux_available=libtmux_ok,
+                attempted_install=True,
+                message='tmux installed',
+            )
+
+    logger.warning(
+        'tmux is not installed and automatic installation failed. '
+        'Run: sudo apt install tmux (or your distro equivalent).'
+    )
+    return HostToolInstallResult(
+        tmux_installed=False,
+        libtmux_available=libtmux_ok,
+        attempted_install=attempted,
+        message='tmux missing; automatic install failed',
+    )
+
+
 def ensure_linux_host_tools(*, install_tmux: bool = True) -> HostToolInstallResult:
     """Ensure tmux is on PATH on Linux and libtmux is importable."""
     if not is_linux_host():
@@ -179,31 +209,7 @@ def ensure_linux_host_tools(*, install_tmux: bool = True) -> HostToolInstallResu
             message='tmux missing; unsupported package manager',
         )
 
-    attempted = False
-    for cmd in _install_command_variants(pm):
-        if cmd[0] == 'sudo' and cmd[1] != '-n' and not _interactive_install_allowed():
-            continue
-        attempted = True
-        logger.info('Installing tmux via: %s', ' '.join(cmd))
-        if _run_install(cmd) and shutil.which('tmux'):
-            logger.info('tmux installed successfully.')
-            return HostToolInstallResult(
-                tmux_installed=True,
-                libtmux_available=libtmux_ok,
-                attempted_install=True,
-                message='tmux installed',
-            )
-
-    logger.warning(
-        'tmux is not installed and automatic installation failed. '
-        'Run: sudo apt install tmux (or your distro equivalent).'
-    )
-    return HostToolInstallResult(
-        tmux_installed=False,
-        libtmux_available=libtmux_ok,
-        attempted_install=attempted,
-        message='tmux missing; automatic install failed',
-    )
+    return _install_tmux_with_package_manager(pm, libtmux_ok)
 
 
 __all__ = [

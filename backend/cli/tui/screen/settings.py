@@ -84,28 +84,16 @@ class ScreenSettingsMixin:
             self._apply_autonomy_level(result['autonomy'])
             self._apply_hud_reasoning_effort(result['reasoning'])
 
-    def _apply_autonomy_level(self, new_level: str) -> None:
-        if getattr(self, '_hud_autonomy_syncing', False):
-            return
-        level = self._visible_autonomy_level(new_level)
-        if level not in {'conservative', 'balanced', 'full'}:
-            return
-        from backend.cli.settings import (
-            get_persisted_autonomy_level,
-            update_autonomy_level,
-        )
-
-        agent_name = self._active_agent_name()
-        persisted = get_persisted_autonomy_level(agent_name)
-        runtime = self._runtime_autonomy_level()
-        if (
+    def _autonomy_already_active(
+        self, level: str, persisted: str, runtime: str
+    ) -> bool:
+        return (
             runtime == level
             and self._hud.state.autonomy_level == level
             and level == persisted
-        ):
-            return
-        if level != persisted:
-            update_autonomy_level(level, agent_name)
+        )
+
+    def _apply_autonomy_runtime(self, level: str) -> None:
         agent_config = self._active_agent_config()
         if agent_config is not None:
             try:
@@ -120,12 +108,8 @@ class ScreenSettingsMixin:
             from backend.cli.settings.mode_runtime import apply_autonomy_to_controller
 
             apply_autonomy_to_controller(controller)
-        try:
-            setattr(self._config, 'autonomy_level', level)
-        except Exception:
-            pass
-        self._hud.update_autonomy(level)
-        self._render_hud_bar()
+
+    def _emit_autonomy_session_context(self) -> None:
         try:
             from backend.core.logging.session_event_logger import (
                 emit_session_context_if_changed,
@@ -134,19 +118,49 @@ class ScreenSettingsMixin:
             emit_session_context_if_changed()
         except Exception:
             pass
-        if runtime != level or persisted != level:
-            from backend.core.autonomy import autonomy_runtime_notice
 
-            self.notify(
-                autonomy_runtime_notice(level),
-                severity='information',
-                timeout=3.0,
+    def _notify_autonomy_runtime_change(self, level: str) -> None:
+        from backend.core.autonomy import autonomy_runtime_notice
+
+        self.notify(
+            autonomy_runtime_notice(level),
+            severity='information',
+            timeout=3.0,
+        )
+        renderer = self._renderer
+        if renderer is not None and hasattr(renderer, 'add_system_message'):
+            renderer.add_system_message(
+                autonomy_runtime_notice(level), title='autonomy'
             )
-            renderer = self._renderer
-            if renderer is not None and hasattr(renderer, 'add_system_message'):
-                renderer.add_system_message(
-                    autonomy_runtime_notice(level), title='autonomy'
-                )
+
+    def _apply_autonomy_level(self, new_level: str) -> None:
+        if getattr(self, '_hud_autonomy_syncing', False):
+            return
+        level = self._visible_autonomy_level(new_level)
+        if level not in {'conservative', 'balanced', 'full'}:
+            return
+        from backend.cli.settings import (
+            get_persisted_autonomy_level,
+            update_autonomy_level,
+        )
+
+        agent_name = self._active_agent_name()
+        persisted = get_persisted_autonomy_level(agent_name)
+        runtime = self._runtime_autonomy_level()
+        if self._autonomy_already_active(level, persisted, runtime):
+            return
+        if level != persisted:
+            update_autonomy_level(level, agent_name)
+        self._apply_autonomy_runtime(level)
+        try:
+            setattr(self._config, 'autonomy_level', level)
+        except Exception:
+            pass
+        self._hud.update_autonomy(level)
+        self._render_hud_bar()
+        self._emit_autonomy_session_context()
+        if runtime != level or persisted != level:
+            self._notify_autonomy_runtime_change(level)
 
     def _apply_hud_reasoning_effort(self, effort_value: str) -> None:
         if getattr(self, '_hud_reasoning_syncing', False):
@@ -239,10 +253,7 @@ class ScreenSettingsMixin:
         if previous != mode or mode != persisted:
             self.notify(f'Mode: {mode}', severity='information', timeout=2.0)
 
-    def _apply_llm_config_to_active_session(self, config) -> str:
-        controller = self._controller
-        if controller is None:
-            return 'saved for new sessions'
+    def _llm_switch_running_status(self, controller: Any) -> str | None:
         try:
             state = controller.get_agent_state()
         except Exception:
@@ -250,15 +261,9 @@ class ScreenSettingsMixin:
         if 'RUNNING' in str(state).upper():
             self._pending_llm_config_apply = True
             return 'saved; active run keeps current model until it is idle'
+        return None
 
-        agent = getattr(controller, 'agent', None)
-        if agent is None:
-            return 'saved; no active agent to update'
-        registry = getattr(agent, 'llm_registry', None)
-        if registry is None:
-            return 'saved; active session has no LLM registry'
-
-        llm_config = config.get_llm_config()
+    def _llm_switch_refresh_registry_config(self, registry: Any, config: Any) -> None:
         try:
             registry.config = copy.deepcopy(config)
             registry.agent_to_llm_config = registry.config.get_agent_to_llm_config_map()
@@ -267,31 +272,36 @@ class ScreenSettingsMixin:
                 'Failed to refresh registry config during model switch',
                 exc_info=True,
             )
+
+    def _llm_switch_resolve_llm(self, registry: Any, llm_config: Any) -> Any:
         replace_llm = getattr(registry, 'replace_llm', None)
         if callable(replace_llm):
-            llm = replace_llm('agent', llm_config)
-        else:
-            service_to_llm = getattr(registry, 'service_to_llm', None)
-            if isinstance(service_to_llm, dict):
-                service_to_llm.pop('agent', None)
-            llm = registry.get_llm('agent', llm_config)
+            return replace_llm('agent', llm_config)
+        service_to_llm = getattr(registry, 'service_to_llm', None)
+        if isinstance(service_to_llm, dict):
+            service_to_llm.pop('agent', None)
+        return registry.get_llm('agent', llm_config)
 
+    def _llm_switch_install_llm(self, agent: Any, llm: Any) -> None:
         set_llm = getattr(agent, 'set_llm', None)
         if callable(set_llm):
             set_llm(llm)
         else:
             setattr(agent, 'llm', llm)
 
+    def _llm_switch_update_agent_config(self, agent: Any, llm_config: Any) -> None:
         running_config = getattr(agent, 'config', None)
-        if running_config is not None:
-            try:
-                running_config.llm_config = llm_config
-            except Exception:
-                _tui_logger.debug(
-                    'Failed to update active agent config LLM during model switch',
-                    exc_info=True,
-                )
+        if running_config is None:
+            return
+        try:
+            running_config.llm_config = llm_config
+        except Exception:
+            _tui_logger.debug(
+                'Failed to update active agent config LLM during model switch',
+                exc_info=True,
+            )
 
+    def _llm_switch_update_planner(self, agent: Any, llm_config: Any) -> None:
         planner = getattr(agent, 'planner', None)
         planner_config = getattr(planner, '_config', None)
         if planner_config is not None:
@@ -311,8 +321,9 @@ class ScreenSettingsMixin:
                     exc_info=True,
                 )
 
-        self._refresh_prompt_managers_after_llm_switch(agent, registry)
-
+    def _llm_switch_update_controller_map(
+        self, controller: Any, agent: Any, llm_config: Any
+    ) -> None:
         try:
             agent_name = getattr(getattr(agent, 'config', None), 'name', None)
             controller.agent_to_llm_config['agent'] = llm_config
@@ -323,13 +334,35 @@ class ScreenSettingsMixin:
                 'Failed to update controller agent_to_llm_config after model switch',
                 exc_info=True,
             )
+
+    def _apply_llm_config_to_active_session(self, config) -> str:
+        controller = self._controller
+        if controller is None:
+            return 'saved for new sessions'
+        status = self._llm_switch_running_status(controller)
+        if status is not None:
+            return status
+
+        agent = getattr(controller, 'agent', None)
+        if agent is None:
+            return 'saved; no active agent to update'
+        registry = getattr(agent, 'llm_registry', None)
+        if registry is None:
+            return 'saved; active session has no LLM registry'
+
+        llm_config = config.get_llm_config()
+        self._llm_switch_refresh_registry_config(registry, config)
+        llm = self._llm_switch_resolve_llm(registry, llm_config)
+        self._llm_switch_install_llm(agent, llm)
+        self._llm_switch_update_agent_config(agent, llm_config)
+        self._llm_switch_update_planner(agent, llm_config)
+        self._refresh_prompt_managers_after_llm_switch(agent, registry)
+        self._llm_switch_update_controller_map(controller, agent, llm_config)
         self._pending_llm_config_apply = False
         return 'applied to active session'
 
-    def _refresh_prompt_managers_after_llm_switch(
-        self, agent: Any, registry: Any
-    ) -> None:
-        prompt_managers = []
+    def _collect_prompt_managers(self, agent: Any) -> list[Any]:
+        prompt_managers: list[Any] = []
         for attr in ('_prompt_manager', 'prompt_manager'):
             try:
                 value = getattr(agent, attr, None)
@@ -342,7 +375,11 @@ class ScreenSettingsMixin:
         prompt_manager = getattr(conversation_memory, 'prompt_manager', None)
         if prompt_manager is not None and prompt_manager not in prompt_managers:
             prompt_managers.append(prompt_manager)
+        return prompt_managers
 
+    def _apply_prompt_manager_configs(
+        self, agent: Any, registry: Any, prompt_managers: list[Any]
+    ) -> None:
         for prompt_manager in prompt_managers:
             for attr, value in (
                 ('_app_config', getattr(registry, 'config', None)),
@@ -356,6 +393,12 @@ class ScreenSettingsMixin:
                     setattr(prompt_manager, attr, value)
                 except Exception:
                     pass
+
+    def _refresh_prompt_managers_after_llm_switch(
+        self, agent: Any, registry: Any
+    ) -> None:
+        prompt_managers = self._collect_prompt_managers(agent)
+        self._apply_prompt_manager_configs(agent, registry, prompt_managers)
 
     def _toggle_autonomy_tabs_visibility(self, mode: str) -> None:
         mode = normalize_interaction_mode(mode)

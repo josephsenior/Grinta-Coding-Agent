@@ -13,6 +13,24 @@ _SYMBOL_AMBIGUITY_HINT = (
     'Retry with path + qualified_name + symbol_kind, or use symbol_id.'
 )
 
+_EDITOR_ERROR_SUMMARIES = {
+    'OLD_STRING_NOT_FOUND': 'replace_string failed: old_string not found exactly.',
+    'OLD_STRING_NOT_UNIQUE': (
+        'replace_string failed: old_string matched multiple occurrences.'
+    ),
+    'FILE_NOT_FOUND': 'file not found.',
+    'INTRODUCED_SYNTAX_ERROR': 'File has syntax errors.',
+    'CONTENT_APPEARS_SERIALIZED': (
+        'content appears serialized (literal escape sequences).'
+    ),
+    'EMPTY_OLD_STRING': 'replace_string failed: old_string must not be empty.',
+    'REPLACE_STRING_ERROR': 'replace_string failed.',
+    'UNDO_NO_PRIOR_VERSION': (
+        'undo is not available: the only recorded change for this file was creating it; '
+        'the file was not modified.'
+    ),
+}
+
 
 def compact_symbol_candidates(
     candidates: list[dict[str, Any]],
@@ -48,31 +66,68 @@ def extract_syntax_line(message: str) -> int | None:
     return None
 
 
+def _strip_syntax_detail_noise(text: str) -> str:
+    if 'Content context:' in text:
+        text = text.split('Content context:', 1)[0].strip()
+    text = text.replace('File has syntax errors.', '')
+    return text.replace('INTRODUCED_SYNTAX_ERROR:', '').strip()
+
+
+def _syntax_location_summary(text: str) -> str | None:
+    location = re.match(
+        r'(?is)^Python syntax error at .+?:\s*line\s+\d+(?::(?P<column>\d+))?',
+        text,
+    )
+    if not location:
+        return None
+    column = location.group('column')
+    return (
+        f'Python syntax error (column {column}).' if column else 'Python syntax error.'
+    )
+
+
+def _first_syntax_error_line(lines: list[str], text: str) -> str:
+    for line in lines:
+        if line.startswith(('SyntaxError:', 'IndentationError:', 'TabError:')):
+            return line
+    return lines[0] if lines else text[:240]
+
+
 def compact_syntax_detail(message: str) -> str:
     """Return a short syntax detail without content-context excerpts."""
     text = (message or '').strip()
     if not text:
         return ''
-    if 'Content context:' in text:
-        text = text.split('Content context:', 1)[0].strip()
-    text = text.replace('File has syntax errors.', '')
-    text = text.replace('INTRODUCED_SYNTAX_ERROR:', '').strip()
-    location = re.match(
-        r'(?is)^Python syntax error at .+?:\s*line\s+\d+(?::(?P<column>\d+))?',
-        text,
-    )
-    if location:
-        column = location.group('column')
-        return (
-            f'Python syntax error (column {column}).'
-            if column
-            else 'Python syntax error.'
-        )
+    text = _strip_syntax_detail_noise(text)
+    location = _syntax_location_summary(text)
+    if location is not None:
+        return location
     lines = [line.strip() for line in text.splitlines() if line.strip()]
-    for line in lines:
-        if line.startswith(('SyntaxError:', 'IndentationError:', 'TabError:')):
-            return line
-    return lines[0] if lines else text[:240]
+    return _first_syntax_error_line(lines, text)
+
+
+def _editor_error_summary(result: Any, error_code: str, operation: str) -> str:
+    summary = _EDITOR_ERROR_SUMMARIES.get(error_code)
+    if summary is not None:
+        return summary
+    raw = str(getattr(result, 'error', '') or '').strip()
+    return raw.splitlines()[0] if raw else f'{operation} failed.'
+
+
+def _editor_error_extra(result: Any, error_code: str) -> dict[str, Any]:
+    metadata = getattr(result, 'metadata', None)
+    extra: dict[str, Any] = {}
+    if isinstance(metadata, dict) and metadata.get('match_count') is not None:
+        extra['match_count'] = metadata['match_count']
+
+    detail = None
+    if error_code == 'INTRODUCED_SYNTAX_ERROR':
+        detail = compact_syntax_detail(str(getattr(result, 'error', '') or ''))
+        line = extract_syntax_line(str(getattr(result, 'error', '') or ''))
+        if line is not None:
+            extra['line'] = line
+
+    return {'detail': detail, **extra}
 
 
 def summarize_editor_error(result: Any) -> tuple[str, str, bool, dict[str, Any]]:
@@ -82,41 +137,9 @@ def summarize_editor_error(result: Any) -> tuple[str, str, bool, dict[str, Any]]
     retryable = bool(getattr(result, 'retryable', True))
     if error_code == 'UNDO_NO_PRIOR_VERSION':
         retryable = False
-    metadata = getattr(result, 'metadata', None)
-    extra: dict[str, Any] = {}
-    if isinstance(metadata, dict) and metadata.get('match_count') is not None:
-        extra['match_count'] = metadata['match_count']
-
-    summaries = {
-        'OLD_STRING_NOT_FOUND': 'replace_string failed: old_string not found exactly.',
-        'OLD_STRING_NOT_UNIQUE': (
-            'replace_string failed: old_string matched multiple occurrences.'
-        ),
-        'FILE_NOT_FOUND': 'file not found.',
-        'INTRODUCED_SYNTAX_ERROR': 'File has syntax errors.',
-        'CONTENT_APPEARS_SERIALIZED': (
-            'content appears serialized (literal escape sequences).'
-        ),
-        'EMPTY_OLD_STRING': 'replace_string failed: old_string must not be empty.',
-        'REPLACE_STRING_ERROR': 'replace_string failed.',
-        'UNDO_NO_PRIOR_VERSION': (
-            'undo is not available: the only recorded change for this file was creating it; '
-            'the file was not modified.'
-        ),
-    }
-    summary = summaries.get(error_code)
-    if summary is None:
-        raw = str(getattr(result, 'error', '') or '').strip()
-        summary = raw.splitlines()[0] if raw else f'{operation} failed.'
-
-    detail = None
-    if error_code == 'INTRODUCED_SYNTAX_ERROR':
-        detail = compact_syntax_detail(str(getattr(result, 'error', '') or ''))
-        line = extract_syntax_line(str(getattr(result, 'error', '') or ''))
-        if line is not None:
-            extra['line'] = line
-
-    return error_code, summary, retryable, {'detail': detail, **extra}
+    summary = _editor_error_summary(result, error_code, operation)
+    extra = _editor_error_extra(result, error_code)
+    return error_code, summary, retryable, extra
 
 
 def _edit_error_fallback_line(fallback: str) -> str:
@@ -241,11 +264,23 @@ def _parse_validation_item_index(message: str) -> int | None:
     return None
 
 
-def parse_validation_error(
-    message: str,
+def _attach_validation_item_path(
+    context: dict[str, Any],
+    payload: dict[str, Any],
+    item_index: int,
+) -> None:
+    file_edits = payload.get('file_edits') or []
+    if 0 <= item_index < len(file_edits):
+        item = file_edits[item_index]
+        if isinstance(item, dict) and isinstance(item.get('path'), str):
+            context['failed_path'] = item['path']
+            context['path'] = item['path']
+
+
+def _build_validation_context(
+    text: str,
     payload: dict[str, Any],
 ) -> dict[str, Any]:
-    text = message.strip()
     item_index = _parse_validation_item_index(text)
     total_ops = len(payload.get('file_edits') or [])
     context: dict[str, Any] = {
@@ -258,29 +293,36 @@ def parse_validation_error(
         context['failed_op_index'] = item_index
         if total_ops:
             context['total_ops'] = total_ops
-        file_edits = payload.get('file_edits') or []
-        if 0 <= item_index < len(file_edits):
-            item = file_edits[item_index]
-            if isinstance(item, dict) and isinstance(item.get('path'), str):
-                context['failed_path'] = item['path']
-                context['path'] = item['path']
+        _attach_validation_item_path(context, payload, item_index)
+    return context
 
+
+def _classify_validation_error(text: str, context: dict[str, Any]) -> None:
     lowered = text.lower()
     if 'symbol' in lowered and 'ambiguous' in lowered:
         context['error_code'] = 'SYMBOL_AMBIGUOUS'
         context['hint'] = _SYMBOL_AMBIGUITY_HINT
-    elif (
-        'could not find symbol' in lowered
-        or 'symbol' in lowered
-        and 'not found' in lowered
+        return
+    if 'could not find symbol' in lowered or (
+        'symbol' in lowered and 'not found' in lowered
     ):
         context['error_code'] = 'SYMBOL_NOT_FOUND'
         context['hint'] = _SYMBOL_AMBIGUITY_HINT
         symbol_match = re.search(r'symbol\s+([^.\n]+)', text, flags=re.IGNORECASE)
         if symbol_match:
             context['symbol'] = symbol_match.group(1).strip('\'"')
-    elif 'missing required' in lowered or 'requires' in lowered:
+        return
+    if 'missing required' in lowered or 'requires' in lowered:
         context['error_code'] = 'VALIDATION_ERROR'
+
+
+def parse_validation_error(
+    message: str,
+    payload: dict[str, Any],
+) -> dict[str, Any]:
+    text = message.strip()
+    context = _build_validation_context(text, payload)
+    _classify_validation_error(text, context)
     return context
 
 

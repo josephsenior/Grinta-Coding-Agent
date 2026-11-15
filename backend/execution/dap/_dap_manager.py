@@ -70,6 +70,26 @@ class DAPDebugManager:
             if debug_action == 'start'
             else timeout
         )
+        self._log_dispatch(action, debug_action, timeout, start_timeout)
+        try:
+            if debug_action == 'start':
+                payload = self._start(action, timeout=start_timeout)
+            else:
+                session = self._get_session(action.session_id)
+                payload = self._dispatch_existing(
+                    session, action, debug_action, timeout
+                )
+            return self._observation(debug_action, payload)
+        except Exception as exc:
+            return self._handle_dispatch_exception(exc, action, debug_action)
+
+    def _log_dispatch(
+        self,
+        action: DebuggerAction,
+        debug_action: str,
+        timeout: float,
+        start_timeout: float,
+    ) -> None:
         _dap_log(
             logging.INFO,
             f'Debugger dispatch: {debug_action or "<empty>"}',
@@ -85,17 +105,6 @@ class DAPDebugManager:
             if debug_action == 'start'
             else timeout,
         )
-        try:
-            if debug_action == 'start':
-                payload = self._start(action, timeout=start_timeout)
-            else:
-                session = self._get_session(action.session_id)
-                payload = self._dispatch_existing(
-                    session, action, debug_action, timeout
-                )
-            return self._observation(debug_action, payload)
-        except Exception as exc:
-            return self._handle_dispatch_exception(exc, action, debug_action)
 
     def _drop_session(self, session: DAPDebugSession) -> None:
         self.sessions.pop(session.session_id, None)
@@ -173,14 +182,42 @@ class DAPDebugManager:
             session.close()
 
     def _start(self, action: DebuggerAction, timeout: float) -> dict[str, Any]:
+        request = self._start_request(action)
+        session_id = self._new_session_id(action)
+        adapter_id, language, adapter_spec = self._start_adapter(action, session_id)
+
+        session = self._build_session(
+            session_id,
+            action,
+            adapter_id,
+            language,
+            request,
+            adapter_spec,
+        )
+        self.sessions[session_id] = session
+        try:
+            return session.start(timeout=timeout)
+        except Exception:
+            self.sessions.pop(session_id, None)
+            session.close()
+            raise
+
+    @staticmethod
+    def _start_request(action: DebuggerAction) -> str:
         request = (action.request or 'launch').strip().lower()
         if request not in {'launch', 'attach'}:
             raise DAPError("debugger request must be 'launch' or 'attach'")
+        return request
 
+    def _new_session_id(self, action: DebuggerAction) -> str:
         session_id = action.session_id or f'dbg-{uuid.uuid4().hex[:8]}'
         if session_id in self.sessions:
             raise DAPError(f'Debug session already exists: {session_id}')
+        return session_id
 
+    def _start_adapter(
+        self, action: DebuggerAction, session_id: str
+    ) -> tuple[str, str, DAPAdapterSpec]:
         adapter = self._adapter_name(action)
         validate_debugger_start(
             action, adapter=adapter, workspace_root=self.workspace_root
@@ -200,22 +237,7 @@ class DAPDebugManager:
         )
         adapter_id = action.adapter_id or adapter or 'generic'
         language = action.language or adapter or 'generic'
-
-        session = self._build_session(
-            session_id,
-            action,
-            adapter_id,
-            language,
-            request,
-            adapter_spec,
-        )
-        self.sessions[session_id] = session
-        try:
-            return session.start(timeout=timeout)
-        except Exception:
-            self.sessions.pop(session_id, None)
-            session.close()
-            raise
+        return adapter_id, language, adapter_spec
 
     def _build_session(
         self,
@@ -356,22 +378,27 @@ class DAPDebugManager:
             return self._EXTENSION_ADAPTERS.get(Path(action.program).suffix.lower())
         return None
 
-    def _adapter_spec(
-        self, action: DebuggerAction, adapter: str | None
-    ) -> DAPAdapterSpec:
-        if action.adapter_command:
-            return build_custom_adapter_spec(
-                action.adapter_command,
-                transport=(action.adapter_transport or 'stdio').strip().lower(),
-                host=action.adapter_host,
-                port=action.adapter_port,
-            )
-        if adapter in self._PYTHON_ADAPTERS:
-            python = resolve_python_executable(action.python)
-            return DAPAdapterSpec(
-                [python, '-m', 'debugpy.adapter'],
-                transport='stdio',
-            )
+    @staticmethod
+    def _custom_adapter_spec(action: DebuggerAction) -> DAPAdapterSpec:
+        return build_custom_adapter_spec(
+            action.adapter_command,
+            transport=(action.adapter_transport or 'stdio').strip().lower(),
+            host=action.adapter_host,
+            port=action.adapter_port,
+        )
+
+    @staticmethod
+    def _python_adapter_spec(action: DebuggerAction) -> DAPAdapterSpec:
+        python = resolve_python_executable(action.python)
+        return DAPAdapterSpec(
+            [python, '-m', 'debugpy.adapter'],
+            transport='stdio',
+        )
+
+    @staticmethod
+    def _discover_adapter_spec(
+        action: DebuggerAction, adapter: str | None
+    ) -> DAPAdapterSpec | None:
         # Auto-discovery: probe PATH for a known adapter so the model
         # doesn't have to hand-roll ``adapter_command`` for the common
         # languages (Go/dlv, Rust/codelldb, JS/js-debug, C#/netcoredbg, …).
@@ -382,22 +409,38 @@ class DAPDebugManager:
             lang = _language_from_extension(Path(action.program).suffix)
             if lang:
                 discovered = _resolve_adapter_spec(lang)
-        if discovered is not None:
-            return discovered
+        return discovered
+
+    @staticmethod
+    def _unsupported_adapter_language(
+        action: DebuggerAction, adapter: str | None
+    ) -> str | None:
+        if adapter is not None:
+            return adapter
+        if action.program:
+            return _language_from_extension(Path(action.program).suffix)
+        return None
+
+    @classmethod
+    def _unsupported_adapter_detail(
+        cls, action: DebuggerAction, adapter: str | None
+    ) -> str:
+        unsupported_language = cls._unsupported_adapter_language(action, adapter)
+        if not unsupported_language:
+            return ''
+        unsupported_hint = _unsupported_recipe_hint(unsupported_language)
+        if not unsupported_hint:
+            return ''
+        return (
+            f' Found installed adapter(s) with unsupported transport: '
+            f'{unsupported_hint}. This runtime currently supports stdio '
+            'and DAP-over-TCP adapters only.'
+        )
+
+    @staticmethod
+    def _missing_adapter_error(adapter: str | None, unsupported: str) -> DAPError:
         hint = f' for adapter {adapter!r}' if adapter else ''
-        unsupported = ''
-        unsupported_language = adapter
-        if unsupported_language is None and action.program:
-            unsupported_language = _language_from_extension(Path(action.program).suffix)
-        if unsupported_language:
-            unsupported_hint = _unsupported_recipe_hint(unsupported_language)
-            if unsupported_hint:
-                unsupported = (
-                    f' Found installed adapter(s) with unsupported transport: '
-                    f'{unsupported_hint}. This runtime currently supports stdio '
-                    'and DAP-over-TCP adapters only.'
-                )
-        raise DAPError(
+        return DAPError(
             'debugger start requires adapter_command'
             f'{hint}. No DAP adapter found on PATH; install one '
             '(e.g. dlv for Go, codelldb or lldb-dap for Rust/C/C++, '
@@ -405,6 +448,19 @@ class DAPDebugManager:
             'stdio-compatible adapter_command or DAP-over-TCP adapter_command '
             f'explicitly.{unsupported}'
         )
+
+    def _adapter_spec(
+        self, action: DebuggerAction, adapter: str | None
+    ) -> DAPAdapterSpec:
+        if action.adapter_command:
+            return self._custom_adapter_spec(action)
+        if adapter in self._PYTHON_ADAPTERS:
+            return self._python_adapter_spec(action)
+        discovered = self._discover_adapter_spec(action, adapter)
+        if discovered is not None:
+            return discovered
+        unsupported = self._unsupported_adapter_detail(action, adapter)
+        raise self._missing_adapter_error(adapter, unsupported)
 
     def _get_session(self, session_id: str | None) -> DAPDebugSession:
         if not session_id:

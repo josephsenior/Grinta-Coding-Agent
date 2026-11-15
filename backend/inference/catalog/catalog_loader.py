@@ -329,34 +329,24 @@ def sanitize_call_kwargs_for_provider(model: str, call_kwargs: dict) -> dict:
     return sanitized
 
 
-def validate_model_transport(
+def _lookup_transport_validation_entry(
     model: str,
-    *,
-    config_provider: str | None = None,
-) -> None:
-    """Fail fast when a catalog model uses an unsupported transport surface."""
-    from backend.inference.exceptions import BadRequestError
-
+    config_provider: str | None,
+) -> ModelEntry | None:
     entry = lookup(model)
     if entry is None and config_provider:
         bare = model.split('/', 1)[-1] if '/' in model else model
         entry = lookup_provider_model(config_provider, bare, allow_aliases=True)
-    if entry is None:
-        return
+    return entry
 
-    transport = _transport_client_for_entry(entry)
-    if transport != TRANSPORT_CLIENT_UNSUPPORTED:
-        return
+
+def _unsupported_transport_error(model: str, entry: ModelEntry) -> Exception:
+    from backend.inference.exceptions import BadRequestError
 
     endpoint = entry.inference_endpoint
     provider = entry.provider
-    opencode_surface = provider in {'opencode', 'opencode-go'}
-    if endpoint == '/responses' and opencode_surface:
-        return
-    if endpoint and endpoint.startswith('/models/') and opencode_surface:
-        return
     if endpoint == '/responses':
-        raise BadRequestError(
+        return BadRequestError(
             (
                 f"Model {model!r} is served via OpenCode '/responses', which Grinta "
                 'does not implement yet. Select a model on '
@@ -366,7 +356,7 @@ def validate_model_transport(
             model=model,
         )
     if endpoint and endpoint.startswith('/models/'):
-        raise BadRequestError(
+        return BadRequestError(
             (
                 f'Model {model!r} is served via OpenCode native Gemini endpoint '
                 f'{endpoint!r}, which Grinta does not implement yet. Select a '
@@ -375,11 +365,33 @@ def validate_model_transport(
             llm_provider=provider,
             model=model,
         )
-    raise BadRequestError(
+    return BadRequestError(
         (f'Model {model!r} requires unsupported transport endpoint {endpoint!r}.'),
         llm_provider=provider,
         model=model,
     )
+
+
+def validate_model_transport(
+    model: str,
+    *,
+    config_provider: str | None = None,
+) -> None:
+    """Fail fast when a catalog model uses an unsupported transport surface."""
+    entry = _lookup_transport_validation_entry(model, config_provider)
+    if entry is None:
+        return
+
+    if _transport_client_for_entry(entry) != TRANSPORT_CLIENT_UNSUPPORTED:
+        return
+
+    endpoint = entry.inference_endpoint
+    opencode_surface = entry.provider in {'opencode', 'opencode-go'}
+    if opencode_surface and (
+        endpoint == '/responses' or (endpoint and endpoint.startswith('/models/'))
+    ):
+        return
+    raise _unsupported_transport_error(model, entry)
 
 
 @functools.lru_cache(maxsize=1)
@@ -667,6 +679,40 @@ def runtime_parameter_mode(entry: ModelEntry) -> dict[str, Any]:
     }
 
 
+def _compact_log_api(metadata: dict[str, Any]) -> dict[str, Any] | None:
+    api = metadata.get('api')
+    if not isinstance(api, dict):
+        return None
+    return {key: api[key] for key in ('id', 'url', 'npm') if api.get(key) is not None}
+
+
+def _compact_log_variants(metadata: dict[str, Any]) -> dict[str, Any] | None:
+    variants = metadata.get(
+        'ai_sdk_variants_metadata_only',
+        metadata.get('variants'),
+    )
+    if not isinstance(variants, dict) or not variants:
+        return None
+    return {
+        'names': sorted(variants.keys()),
+        'not_applied_as_python_kwargs': True,
+    }
+
+
+def _compact_log_options(metadata: dict[str, Any]) -> dict[str, Any] | None:
+    options = metadata.get('options') or metadata.get('runtime_options')
+    if isinstance(options, dict) and options:
+        return options
+    return None
+
+
+def _compact_log_capabilities(metadata: dict[str, Any]) -> dict[str, Any] | None:
+    capabilities = metadata.get('capabilities')
+    if isinstance(capabilities, dict):
+        return _compact_capabilities_for_log(capabilities)
+    return None
+
+
 def compact_metadata_for_log(metadata: dict[str, Any] | None) -> dict[str, Any] | None:
     """Return compact docs-only metadata safe for per-call logs."""
     if not isinstance(metadata, dict):
@@ -681,26 +727,18 @@ def compact_metadata_for_log(metadata: dict[str, Any] | None) -> dict[str, Any] 
         'inference_url',
     )
     compact = {key: metadata[key] for key in keys if metadata.get(key) is not None}
-    api = metadata.get('api')
-    if isinstance(api, dict):
-        compact['api'] = {
-            key: api[key] for key in ('id', 'url', 'npm') if api.get(key) is not None
-        }
-    options = metadata.get('options') or metadata.get('runtime_options')
-    if isinstance(options, dict) and options:
+    api = _compact_log_api(metadata)
+    if api is not None:
+        compact['api'] = api
+    options = _compact_log_options(metadata)
+    if options is not None:
         compact['options'] = options
-    capabilities = metadata.get('capabilities')
-    if isinstance(capabilities, dict):
-        compact['capabilities'] = _compact_capabilities_for_log(capabilities)
-    variants = metadata.get(
-        'ai_sdk_variants_metadata_only',
-        metadata.get('variants'),
-    )
-    if isinstance(variants, dict) and variants:
-        compact['ai_sdk_variants_metadata_only'] = {
-            'names': sorted(variants.keys()),
-            'not_applied_as_python_kwargs': True,
-        }
+    capabilities = _compact_log_capabilities(metadata)
+    if capabilities is not None:
+        compact['capabilities'] = capabilities
+    variants = _compact_log_variants(metadata)
+    if variants is not None:
+        compact['ai_sdk_variants_metadata_only'] = variants
     runtime_reasoning = metadata.get('runtime_reasoning')
     if isinstance(runtime_reasoning, dict):
         compact['runtime_reasoning'] = runtime_reasoning
@@ -801,6 +839,10 @@ def lookup(model: str) -> ModelEntry | None:
     return None
 
 
+def _prefer_price(primary: float | None, fallback: float | None) -> float | None:
+    return primary if primary is not None else fallback
+
+
 def _pricing_for_entry(
     entry: ModelEntry, *, prompt_tokens: int | None = None
 ) -> dict[str, float] | None:
@@ -814,26 +856,10 @@ def _pricing_for_entry(
         and threshold is not None
         and prompt_tokens > threshold
     ):
-        input_price = (
-            entry.long_input_price_per_m
-            if entry.long_input_price_per_m is not None
-            else input_price
-        )
-        output_price = (
-            entry.long_output_price_per_m
-            if entry.long_output_price_per_m is not None
-            else output_price
-        )
-        cached_input = (
-            entry.long_cached_input_price_per_m
-            if entry.long_cached_input_price_per_m is not None
-            else cached_input
-        )
-        cached_write = (
-            entry.long_cached_write_price_per_m
-            if entry.long_cached_write_price_per_m is not None
-            else cached_write
-        )
+        input_price = _prefer_price(entry.long_input_price_per_m, input_price)
+        output_price = _prefer_price(entry.long_output_price_per_m, output_price)
+        cached_input = _prefer_price(entry.long_cached_input_price_per_m, cached_input)
+        cached_write = _prefer_price(entry.long_cached_write_price_per_m, cached_write)
     if input_price is None:
         return None
     return {

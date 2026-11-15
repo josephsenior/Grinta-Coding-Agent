@@ -32,26 +32,14 @@ def build_goal_context_for_compaction(
     )
 
 
-def strip_verbatim_user_echo(
+def _replace_echoed_goal(
     summary: str,
+    goal: str,
+    user_texts: list[str],
     *,
-    state: object | None = None,
-    snapshot: dict[str, Any] | None = None,
+    state: object | None,
+    snapshot: dict[str, Any] | None,
 ) -> str:
-    """Replace USER GOAL sections that echo raw user messages with synthesized goal."""
-    if not summary or _USER_GOAL_HEADER not in summary:
-        return summary
-
-    if snapshot is None and state is not None:
-        snapshot = _load_snapshot_safe(state)
-    user_texts = _user_message_texts(snapshot)
-    if not user_texts:
-        return summary
-
-    goal = _extract_section(summary, _USER_GOAL_HEADER)
-    if not goal:
-        return summary
-
     for raw in user_texts:
         if len(raw) < 40:
             continue
@@ -74,6 +62,35 @@ def strip_verbatim_user_echo(
                 1,
             )
     return summary
+
+
+def strip_verbatim_user_echo(
+    summary: str,
+    *,
+    state: object | None = None,
+    snapshot: dict[str, Any] | None = None,
+) -> str:
+    """Replace USER GOAL sections that echo raw user messages with synthesized goal."""
+    if not summary or _USER_GOAL_HEADER not in summary:
+        return summary
+
+    if snapshot is None and state is not None:
+        snapshot = _load_snapshot_safe(state)
+    user_texts = _user_message_texts(snapshot)
+    if not user_texts:
+        return summary
+
+    goal = _extract_section(summary, _USER_GOAL_HEADER)
+    if not goal:
+        return summary
+
+    return _replace_echoed_goal(
+        summary,
+        goal,
+        user_texts,
+        state=state,
+        snapshot=snapshot,
+    )
 
 
 def _load_snapshot_safe(state: object) -> dict[str, Any] | None:

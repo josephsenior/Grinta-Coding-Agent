@@ -343,28 +343,33 @@ class GrintaSettingsDialog(ModalDialog[dict[str, Any] | None]):
         return next(iter(self._entries_by_provider), 'openai')
 
     def _current_model_for_provider(self, provider: str | None) -> str:
-        from backend.inference.catalog.catalog_loader import (
-            lookup_provider_model,
-            runtime_model_id,
-        )
+        from backend.inference.catalog import catalog_loader
 
         entries = self._entries_by_provider.get(provider or '', [])
         if not entries:
             return '__custom__'
         try:
-            model = (self._config.get_llm_config().model or '').strip()
-            bare = model.split('/', 1)[1] if model.startswith(f'{provider}/') else model
-            entry = lookup_provider_model(provider, bare, allow_aliases=True)
-            if entry is not None:
-                return entry.name
-            for candidate in entries:
-                if bare in {candidate.name, runtime_model_id(candidate)}:
-                    return candidate.name
-            if bare:
-                return '__custom__'
+            matched = self._match_configured_model(provider, entries, catalog_loader)
+            if matched is not None:
+                return matched
         except Exception:
             pass
-        return '__custom__' if not entries else entries[0].name
+        return entries[0].name
+
+    def _match_configured_model(
+        self, provider: str | None, entries: list[Any], catalog_loader: Any
+    ) -> str | None:
+        model = (self._config.get_llm_config().model or '').strip()
+        bare = model.split('/', 1)[1] if model.startswith(f'{provider}/') else model
+        entry = catalog_loader.lookup_provider_model(provider, bare, allow_aliases=True)
+        if entry is not None:
+            return entry.name
+        for candidate in entries:
+            if bare in {candidate.name, catalog_loader.runtime_model_id(candidate)}:
+                return candidate.name
+        if bare:
+            return '__custom__'
+        return None
 
     def _current_custom_model_for_provider(self, provider: str | None) -> str:
         try:

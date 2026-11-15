@@ -235,28 +235,34 @@ class CDPConnection:
     async def _read_loop(self) -> None:
         try:
             async for raw in self._ws:
-                try:
-                    msg = json.loads(raw)
-                except ValueError:
-                    continue
-                mid = msg.get('id')
-                if mid is not None:
-                    future = self._pending.pop(mid, None)
-                    if future is not None and not future.done():
-                        future.set_result(msg)
-                    continue
-                method = msg.get('method')
-                if method:
-                    self._events.setdefault(method, []).append(msg.get('params', {}))
+                self._dispatch_message(raw)
         except asyncio.CancelledError:
             raise
         except Exception as exc:  # connection closed or malformed frame
             logger.debug('CDP read loop ended: %s', exc)
         finally:
-            for future in self._pending.values():
-                if not future.done():
-                    future.set_exception(CDPError('CDP connection closed'))
-            self._pending.clear()
+            self._fail_pending()
+
+    def _dispatch_message(self, raw: Any) -> None:
+        try:
+            msg = json.loads(raw)
+        except ValueError:
+            return
+        mid = msg.get('id')
+        if mid is not None:
+            future = self._pending.pop(mid, None)
+            if future is not None and not future.done():
+                future.set_result(msg)
+            return
+        method = msg.get('method')
+        if method:
+            self._events.setdefault(method, []).append(msg.get('params', {}))
+
+    def _fail_pending(self) -> None:
+        for future in self._pending.values():
+            if not future.done():
+                future.set_exception(CDPError('CDP connection closed'))
+        self._pending.clear()
 
     async def send(
         self,

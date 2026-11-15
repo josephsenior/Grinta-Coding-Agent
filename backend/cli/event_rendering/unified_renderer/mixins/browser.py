@@ -13,6 +13,42 @@ from backend.cli.event_rendering.unified_renderer.utils import (
 from backend.cli.theme import NAVY_ERROR
 
 
+def _browser_secondary(
+    action_key: str,
+    result: str | None,
+    error: str | None,
+) -> tuple[str | None, str]:
+    if error:
+        return ('error' if len(error) > 60 else error), 'err'
+    if result:
+        return _BROWSER_OUTCOMES.get(action_key, 'done'), 'ok'
+    return None, 'neutral'
+
+
+def _browser_extra_lines(
+    action_key: str,
+    url: str,
+    result: str | None,
+    error: str | None,
+) -> list[ActivityLine]:
+    from backend.cli.tool_display.renderers.browser import (
+        render_browser_navigation,
+        render_browser_page,
+    )
+
+    if result and action_key in {'screenshot', 'snapshot', 'browse'}:
+        rich_lines = render_browser_page(
+            url,
+            content_preview=result,
+        )
+    else:
+        rich_lines = render_browser_navigation(action_key, url)
+    extra_lines = [ActivityLine(str(line), indent=0) for line in rich_lines[1:]]
+    if error:
+        extra_lines.append(ActivityLine(f'Error: {error}', style=NAVY_ERROR, indent=0))
+    return extra_lines
+
+
 class _BrowserMixin:
     @staticmethod
     def browser_action(
@@ -22,41 +58,12 @@ class _BrowserMixin:
         error: str | None = None,
     ) -> ActivityCard:
         """Create an activity card for a browser action."""
-        from backend.cli.tool_display.renderers.browser import (
-            render_browser_navigation,
-            render_browser_page,
-        )
-
         action_key = (action_name or 'browser').strip().lower()
         detail = url[:80] if url else action_name
 
-        secondary = None
-        secondary_kind = 'neutral'
-        if error:
-            secondary = 'error' if len(error) > 60 else error
-            secondary_kind = 'err'
-        elif result:
-            secondary = _BROWSER_OUTCOMES.get(action_key, 'done')
-            secondary_kind = 'ok'
-
-        extra_lines: list[ActivityLine] = []
-        if result and action_key in {'screenshot', 'snapshot', 'browse'}:
-            rich_lines = render_browser_page(
-                url,
-                content_preview=result,
-            )
-        else:
-            rich_lines = render_browser_navigation(action_key, url)
-        for line in rich_lines[1:]:
-            extra_lines.append(ActivityLine(str(line), indent=0))
-        if error:
-            extra_lines.append(
-                ActivityLine(f'Error: {error}', style=NAVY_ERROR, indent=0)
-            )
-
-        meta_tokens: list[str] = []
-        if url:
-            meta_tokens.append(f'url: {url[:60]}')
+        secondary, secondary_kind = _browser_secondary(action_key, result, error)
+        extra_lines = _browser_extra_lines(action_key, url, result, error)
+        meta_tokens = [f'url: {url[:60]}'] if url else []
 
         return ActivityCard(
             verb=action_name.title(),

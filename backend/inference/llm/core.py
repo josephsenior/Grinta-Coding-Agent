@@ -67,39 +67,13 @@ class LLM(RetryMixin, DebugMixin):
         from backend.inference import llm as llm_module
 
         self.config: LLMConfig = llm_module.copy.deepcopy(config)
-        if not self.config.model or not str(self.config.model).strip():
-            raise AuthenticationError(
-                'No LLM model is configured. Set llm_model in settings.json or LLM_MODEL in the environment.',
-                model=None,
-            )
+        self._validate_configured_model()
+        assert self.config.model is not None
 
-        # Early-exit validation: Check if the model name is known to the catalog
-        # or has an explicit provider prefix. This prevents hard 404s later.
         resolver = _get_provider_resolver()
         config_provider = getattr(self.config, 'custom_llm_provider', None)
-        if (
-            isinstance(config_provider, str)
-            and config_provider.strip()
-            and self.config.model
-            and '/' not in str(self.config.model)
-        ):
-            provider = config_provider.strip().lower()
-            model = str(self.config.model).strip()
-            if provider and model:
-                self.config.model = f'{provider}/{model}'
-        try:
-            # resolve_provider raises ValueError if the model is unknown and has no prefix
-            resolver.resolve_provider(
-                self.config.model, config_provider=config_provider
-            )
-        except ValueError as exc:
-            from backend.inference.exceptions import NotFoundError
-
-            raise NotFoundError(
-                f"Model '{self.config.model}' is not registered in the catalog and lacks a provider prefix. "
-                "Please configure a valid model (e.g. 'openai/gpt-4o' or a known catalog entry).",
-                model=self.config.model,
-            ) from exc
+        self._apply_config_provider_prefix(config_provider)
+        self._validate_model_registered(resolver, config_provider)
 
         self.service_id = service_id
         self.metrics: Metrics = (
@@ -143,7 +117,45 @@ class LLM(RetryMixin, DebugMixin):
         )
         self._cached_features = _load_cached_features(self.config.model)
         _apply_custom_tokenizer(self.config)
+        self._initialize_runtime_profile(
+            getattr(self.config, 'custom_llm_provider', None)
+        )
+        self._register_session_context()
 
+    def _validate_configured_model(self) -> None:
+        if not self.config.model or not str(self.config.model).strip():
+            raise AuthenticationError(
+                'No LLM model is configured. Set llm_model in settings.json or LLM_MODEL in the environment.',
+                model=None,
+            )
+
+    def _apply_config_provider_prefix(self, config_provider: Any) -> None:
+        if (
+            isinstance(config_provider, str)
+            and config_provider.strip()
+            and self.config.model
+            and '/' not in str(self.config.model)
+        ):
+            provider = config_provider.strip().lower()
+            model = str(self.config.model).strip()
+            if provider and model:
+                self.config.model = f'{provider}/{model}'
+
+    def _validate_model_registered(self, resolver: Any, config_provider: Any) -> None:
+        try:
+            resolver.resolve_provider(
+                self.config.model, config_provider=config_provider
+            )
+        except ValueError as exc:
+            from backend.inference.exceptions import NotFoundError
+
+            raise NotFoundError(
+                f"Model '{self.config.model}' is not registered in the catalog and lacks a provider prefix. "
+                "Please configure a valid model (e.g. 'openai/gpt-4o' or a known catalog entry).",
+                model=self.config.model,
+            ) from exc
+
+    def _initialize_runtime_profile(self, config_provider: Any) -> None:
         from backend.inference.runtime_profile import (
             attach_runtime_profile,
             resolve_runtime_profile,
@@ -151,7 +163,7 @@ class LLM(RetryMixin, DebugMixin):
 
         self.runtime_profile = resolve_runtime_profile(
             self.config,
-            provider=getattr(self.config, 'custom_llm_provider', None),
+            provider=config_provider,
         )
         attach_runtime_profile(self.config, self.runtime_profile)
         logger.info(
@@ -161,6 +173,8 @@ class LLM(RetryMixin, DebugMixin):
             self.runtime_profile.source,
             self.runtime_profile.context_limits.usable_input_tokens,
         )
+
+    def _register_session_context(self) -> None:
         try:
             from backend.core.logging.session_context import register_runtime_context
             from backend.core.logging.session_event_logger import (
@@ -363,70 +377,62 @@ class LLM(RetryMixin, DebugMixin):
             json.dumps(log_payload, sort_keys=True, default=str),
         )
 
-    def _record_response_metrics(self, response: Any, latency: float) -> None:
-        """Record latency, cost, and token usage from an LLM response.
-
-        Centralises the metrics-extraction logic shared by ``completion()``
-        and ``acompletion()`` so it is defined in exactly one place.
-        """
-        self.metrics.add_response_latency(latency, response.id)
-        if not response.usage:
-            return
-
-        usage = response.usage
-        prompt_tokens = usage.get('prompt_tokens', 0)
-        completion_tokens = usage.get('completion_tokens', 0)
+    @staticmethod
+    def _extract_reasoning_tokens(usage: dict[str, Any]) -> Any:
         reasoning_tokens = usage.get('reasoning_tokens', 0)
-        if not reasoning_tokens and 'completion_tokens_details' in usage:
-            completion_details: Any = usage['completion_tokens_details']
-            if hasattr(completion_details, 'reasoning_tokens'):
-                reasoning_tokens = completion_details.reasoning_tokens
-            elif isinstance(completion_details, dict):
-                reasoning_tokens = completion_details.get('reasoning_tokens', 0)
-        usage_estimated = bool(usage.get('is_estimated', False))
+        if reasoning_tokens or 'completion_tokens_details' not in usage:
+            return reasoning_tokens
+        completion_details = usage['completion_tokens_details']
+        if hasattr(completion_details, 'reasoning_tokens'):
+            return completion_details.reasoning_tokens
+        if isinstance(completion_details, dict):
+            return completion_details.get('reasoning_tokens', 0)
+        return reasoning_tokens
 
-        # Extract cache tokens from provider-specific nested structures
+    @staticmethod
+    def _extract_cache_read_tokens(usage: dict[str, Any]) -> Any:
         cache_read = usage.get('cache_read_tokens', 0)
+        if cache_read or 'prompt_tokens_details' not in usage:
+            return cache_read
+        prompt_details = usage['prompt_tokens_details']
+        if hasattr(prompt_details, 'cached_tokens'):
+            return prompt_details.cached_tokens
+        if isinstance(prompt_details, dict):
+            return prompt_details.get('cached_tokens', 0)
+        return cache_read
+
+    @staticmethod
+    def _extract_cache_write_tokens(usage: dict[str, Any]) -> Any:
         cache_write = usage.get('cache_write_tokens', 0)
+        if cache_write or 'model_extra' not in usage:
+            return cache_write
+        extra = usage['model_extra']
+        if isinstance(extra, dict):
+            return extra.get('cache_creation_input_tokens', 0)
+        return cache_write
 
-        if not cache_read and 'prompt_tokens_details' in usage:
-            prompt_details: Any = usage['prompt_tokens_details']
-            if hasattr(prompt_details, 'cached_tokens'):
-                cache_read = prompt_details.cached_tokens
-            elif isinstance(prompt_details, dict):
-                cache_read = prompt_details.get('cached_tokens', 0)
-
-        if not cache_write and 'model_extra' in usage:
-            extra: Any = usage['model_extra']
-            if isinstance(extra, dict):
-                cache_write = extra.get('cache_creation_input_tokens', 0)
-
-        cost = self.client.get_completion_cost(
-            prompt_tokens=prompt_tokens,
-            completion_tokens=completion_tokens,
-            config=self.config,
-            cache_read_tokens=cache_read,
-            cache_write_tokens=cache_write,
-        )
-        self.metrics.add_cost(cost)
-
+    def _take_prompt_accounting_tokens(self) -> tuple[int, int]:
         accounting = getattr(self, '_last_prompt_accounting', None) or {}
         full_request_tokens = int(accounting.get('full_request_tokens', 0) or 0)
         usable_input_tokens = int(accounting.get('usable_input_tokens', 0) or 0)
         self._last_prompt_accounting = None
+        return full_request_tokens, usable_input_tokens
 
-        self.metrics.add_token_usage(
-            prompt_tokens=prompt_tokens,
-            completion_tokens=completion_tokens,
-            cache_read_tokens=cache_read,
-            cache_write_tokens=cache_write,
-            context_window=self._get_context_window_for_metrics(),
-            response_id=response.id,
-            usage_estimated=usage_estimated,
-            reasoning_tokens=int(reasoning_tokens or 0),
-            full_request_tokens=full_request_tokens,
-            usable_input_tokens=usable_input_tokens,
-        )
+    def _emit_response_metrics(
+        self,
+        *,
+        response: Any,
+        latency: float,
+        prompt_tokens: Any,
+        completion_tokens: Any,
+        reasoning_tokens: Any,
+        cache_read: Any,
+        cache_write: Any,
+        usage_estimated: bool,
+        cost: Any,
+        full_request_tokens: int,
+        usable_input_tokens: int,
+    ) -> None:
         try:
             from backend.core.logging.session_event_logger import emit_session_event
             from backend.telemetry.evidence import EvidenceKind, emit_execution_evidence
@@ -468,6 +474,61 @@ class LLM(RetryMixin, DebugMixin):
             )
         except Exception:
             logger.debug('METRICS session event failed', exc_info=True)
+
+    def _record_response_metrics(self, response: Any, latency: float) -> None:
+        """Record latency, cost, and token usage from an LLM response.
+
+        Centralises the metrics-extraction logic shared by ``completion()``
+        and ``acompletion()`` so it is defined in exactly one place.
+        """
+        self.metrics.add_response_latency(latency, response.id)
+        if not response.usage:
+            return
+
+        usage = response.usage
+        prompt_tokens = usage.get('prompt_tokens', 0)
+        completion_tokens = usage.get('completion_tokens', 0)
+        reasoning_tokens = self._extract_reasoning_tokens(usage)
+        usage_estimated = bool(usage.get('is_estimated', False))
+        cache_read = self._extract_cache_read_tokens(usage)
+        cache_write = self._extract_cache_write_tokens(usage)
+
+        cost = self.client.get_completion_cost(
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            config=self.config,
+            cache_read_tokens=cache_read,
+            cache_write_tokens=cache_write,
+        )
+        self.metrics.add_cost(cost)
+
+        full_request_tokens, usable_input_tokens = self._take_prompt_accounting_tokens()
+
+        self.metrics.add_token_usage(
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            cache_read_tokens=cache_read,
+            cache_write_tokens=cache_write,
+            context_window=self._get_context_window_for_metrics(),
+            response_id=response.id,
+            usage_estimated=usage_estimated,
+            reasoning_tokens=int(reasoning_tokens or 0),
+            full_request_tokens=full_request_tokens,
+            usable_input_tokens=usable_input_tokens,
+        )
+        self._emit_response_metrics(
+            response=response,
+            latency=latency,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            reasoning_tokens=reasoning_tokens,
+            cache_read=cache_read,
+            cache_write=cache_write,
+            usage_estimated=usage_estimated,
+            cost=cost,
+            full_request_tokens=full_request_tokens,
+            usable_input_tokens=usable_input_tokens,
+        )
 
     def _get_context_window_for_metrics(self) -> int:
         """Return a best-effort context window (total tokens) for the active model.

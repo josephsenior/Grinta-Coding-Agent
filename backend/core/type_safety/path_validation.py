@@ -634,6 +634,41 @@ def _resolve_readable_candidate(
     return (workspace / normalized).resolve()
 
 
+def _readable_boundaries(
+    workspace_root: str | Path,
+    extra_read_roots: tuple[Path, ...] | None,
+) -> tuple[Path, Path, tuple[Path, ...]]:
+    workspace, data_root = _readable_path_roots(workspace_root)
+    configured_extra = extra_read_roots
+    if configured_extra is None:
+        configured_extra = resolve_configured_extra_read_roots()
+    allowed_roots = (workspace, data_root, *configured_extra)
+    return workspace, data_root, allowed_roots
+
+
+def _resolve_readable_full_path(path: str, workspace: Path) -> Path:
+    validation_must_be_relative = not _is_absolute_input_path(path)
+    sanitized = _validate_path_string(
+        path,
+        must_be_relative=validation_must_be_relative,
+    )
+
+    try:
+        return _resolve_readable_candidate(path, workspace, sanitized)
+    except (OSError, ValueError) as exc:
+        raise PathValidationError(f'Invalid path: {exc}', path) from exc
+
+
+def _find_containing_read_root(
+    full_path: Path,
+    allowed_roots: tuple[Path, ...],
+) -> Path | None:
+    return next(
+        (root for root in allowed_roots if _path_under_root(full_path, root)),
+        None,
+    )
+
+
 def validate_readable_path(
     path: str,
     workspace_root: str | Path,
@@ -657,26 +692,11 @@ def validate_readable_path(
             path,
         )
 
-    workspace, data_root = _readable_path_roots(workspace_root)
-    configured_extra = extra_read_roots
-    if configured_extra is None:
-        configured_extra = resolve_configured_extra_read_roots()
-    allowed_roots = (workspace, data_root, *configured_extra)
-    validation_must_be_relative = not _is_absolute_input_path(path)
-    sanitized = _validate_path_string(
-        path,
-        must_be_relative=validation_must_be_relative,
+    workspace, data_root, allowed_roots = _readable_boundaries(
+        workspace_root, extra_read_roots
     )
-
-    try:
-        full_path = _resolve_readable_candidate(path, workspace, sanitized)
-    except (OSError, ValueError) as exc:
-        raise PathValidationError(f'Invalid path: {exc}', path) from exc
-
-    containing_root = next(
-        (root for root in allowed_roots if _path_under_root(full_path, root)),
-        None,
-    )
+    full_path = _resolve_readable_full_path(path, workspace)
+    containing_root = _find_containing_read_root(full_path, allowed_roots)
     if containing_root is None:
         raise PathValidationError(
             f'Path outside workspace boundary: {path}',

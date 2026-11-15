@@ -13,6 +13,7 @@ import uuid
 import webbrowser
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
+from typing import Any
 from urllib.parse import parse_qs, urlencode, urlparse
 
 import httpx
@@ -209,14 +210,15 @@ def _callback(query, state, registered_client):
     return code, client
 
 
-def login(profile='default', timeout=300):
+def _load_login_state(profile):
     with _lock():
         previous = _load(profile) or {}
         host = _load('__host__') or {'id': 'urn:uuid:' + str(uuid.uuid4())}
         _save('__host__', host)
-    state, nonce, verifier = (secrets.token_urlsafe(32) for _ in range(3))
-    result = {}
+    return previous, host
 
+
+def _callback_handler(state, previous, result):
     class Callback(BaseHTTPRequestHandler):
         def log_message(self, *args):
             pass
@@ -238,29 +240,47 @@ def login(profile='default', timeout=300):
             self.end_headers()
             self.wfile.write(b'Return to Grinta to finish sign-in.')
 
-    with HTTPServer(('127.0.0.1', 0), Callback) as server:
+    return Callback
+
+
+def _authorize_params(*, previous, host, redirect, state, nonce, verifier):
+    params = {
+        'client_id': previous.get('client_id', 'dynamic_agent_client'),
+        'ext_agent_host_id': host['id'],
+        'response_type': 'code',
+        'redirect_uri': redirect,
+        'scope': SCOPE,
+        'resource': RESOURCE,
+        'state': state,
+        'nonce': nonce,
+        'code_challenge_method': 'S256',
+        'code_challenge': base64.urlsafe_b64encode(
+            hashlib.sha256(verifier.encode()).digest()
+        )
+        .decode()
+        .rstrip('='),
+    }
+    if previous.get('client_id'):
+        if previous.get('id_token'):
+            params['id_token_hint'] = previous['id_token']
+    else:
+        params['agent_name_hint'] = 'Grinta'
+    return params
+
+
+def _run_browser_login(*, previous, host, state, nonce, verifier, timeout):
+    result: dict[str, Any] = {}
+    callback = _callback_handler(state, previous, result)
+    with HTTPServer(('127.0.0.1', 0), callback) as server:
         redirect = f'http://127.0.0.1:{server.server_port}/auth/callback'
-        params = {
-            'client_id': previous.get('client_id', 'dynamic_agent_client'),
-            'ext_agent_host_id': host['id'],
-            'response_type': 'code',
-            'redirect_uri': redirect,
-            'scope': SCOPE,
-            'resource': RESOURCE,
-            'state': state,
-            'nonce': nonce,
-            'code_challenge_method': 'S256',
-            'code_challenge': base64.urlsafe_b64encode(
-                hashlib.sha256(verifier.encode()).digest()
-            )
-            .decode()
-            .rstrip('='),
-        }
-        if previous.get('client_id'):
-            if previous.get('id_token'):
-                params['id_token_hint'] = previous['id_token']
-        else:
-            params['agent_name_hint'] = 'Grinta'
+        params = _authorize_params(
+            previous=previous,
+            host=host,
+            redirect=redirect,
+            state=state,
+            nonce=nonce,
+            verifier=verifier,
+        )
         if not webbrowser.open(ISSUER + '/api/accounts/authorize?' + urlencode(params)):
             raise PlanAuthError('Could not open the system browser.')
         deadline = time.monotonic() + timeout
@@ -270,6 +290,19 @@ def login(profile='default', timeout=300):
             server.timeout = min(1, deadline - time.monotonic())
             server.handle_request()
     code, client_id = result['value']
+    return redirect, code, client_id
+
+
+def _complete_login(
+    *,
+    profile,
+    previous,
+    client_id,
+    code,
+    verifier,
+    redirect,
+    nonce,
+):
     with _lock():
         # Retain the issued registration even if exchange fails or the code expires.
         if (_load(profile) or {}) != previous:
@@ -293,6 +326,28 @@ def login(profile='default', timeout=300):
             tokens,
         )
         _save(profile, record)
+
+
+def login(profile='default', timeout=300):
+    previous, host = _load_login_state(profile)
+    state, nonce, verifier = (secrets.token_urlsafe(32) for _ in range(3))
+    redirect, code, client_id = _run_browser_login(
+        previous=previous,
+        host=host,
+        state=state,
+        nonce=nonce,
+        verifier=verifier,
+        timeout=timeout,
+    )
+    _complete_login(
+        profile=profile,
+        previous=previous,
+        client_id=client_id,
+        code=code,
+        verifier=verifier,
+        redirect=redirect,
+        nonce=nonce,
+    )
 
 
 def main():

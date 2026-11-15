@@ -202,6 +202,28 @@ class StateTransitionService:
         except Exception:
             logger.debug('Session log audit refresh scheduling failed', exc_info=True)
 
+    @staticmethod
+    def _start_watchdog_for_running(controller, start_watchdog) -> None:
+        if callable(start_watchdog):
+            try:
+                start_watchdog()
+            except Exception:
+                pass
+        retry_service = getattr(controller, 'retry_service', None)
+        ensure_worker = getattr(retry_service, 'ensure_worker_started', None)
+        if callable(ensure_worker):
+            try:
+                ensure_worker()
+            except Exception:
+                pass
+
+    @staticmethod
+    def _stop_watchdog_safely(stop_watchdog) -> None:
+        try:
+            stop_watchdog()
+        except Exception:
+            pass
+
     def _handle_watchdog_lifecycle(
         self, old_state: AgentState, new_state: AgentState
     ) -> None:
@@ -219,27 +241,13 @@ class StateTransitionService:
         stop_watchdog = getattr(controller, '_stop_watchdog', None)
 
         if new_state == AgentState.RUNNING:
-            if callable(start_watchdog):
-                try:
-                    start_watchdog()
-                except Exception:
-                    pass
-            retry_service = getattr(controller, 'retry_service', None)
-            ensure_worker = getattr(retry_service, 'ensure_worker_started', None)
-            if callable(ensure_worker):
-                try:
-                    ensure_worker()
-                except Exception:
-                    pass
+            self._start_watchdog_for_running(controller, start_watchdog)
         elif (
             old_state == AgentState.RUNNING
             and new_state != AgentState.RUNNING
             and callable(stop_watchdog)
         ):
-            try:
-                stop_watchdog()
-            except Exception:
-                pass
+            self._stop_watchdog_safely(stop_watchdog)
 
     async def _handle_state_reset(self, new_state: AgentState) -> None:
         if new_state in (AgentState.STOPPED, AgentState.ERROR):

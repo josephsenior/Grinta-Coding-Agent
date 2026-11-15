@@ -6,7 +6,7 @@ buffer retains complete output for the overflow detail view.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from backend.cli.tui.helpers import (
     _join_secondary_parts,
@@ -106,6 +106,34 @@ def _handle_terminal_close_action(
     )
 
 
+def _take_terminal_observation_card(
+    orch: 'RendererEventProcessorMixin', action_id: int | None
+) -> tuple[Any, str] | None:
+    kind = orch._tool_card_kind(action_id)
+    if kind is None:
+        return None
+    card = orch._take_tool_card(action_id, expected_kind=kind)
+    if card is None:
+        return None
+    return card, kind
+
+
+def _remember_terminal_observation_card(
+    orch: 'RendererEventProcessorMixin', session_id: str, card: Any
+) -> None:
+    if not session_id:
+        return
+    orch._pending_terminal_scan_cards[session_id] = card
+    if hasattr(orch, '_terminal_cards_by_session'):
+        orch._terminal_cards_by_session[session_id] = card
+
+
+def _terminal_observation_state(kind: str, ok: bool) -> str:
+    if kind == 'terminal_run' and ok:
+        return 'background'
+    return 'done' if ok else 'failed'
+
+
 def _handle_terminal_observation(
     orch: 'RendererEventProcessorMixin', event: TerminalObservation
 ) -> None:
@@ -114,29 +142,19 @@ def _handle_terminal_observation(
     content = sanitize_terminal_observation_content(content)
 
     orch._accumulate_terminal_scrollback(session_id, content)
-    action_id = getattr(event, 'cause', None)
-    kind = orch._tool_card_kind(action_id)
-    if kind is None:
+    resolved = _take_terminal_observation_card(orch, getattr(event, 'cause', None))
+    if resolved is None:
         return
-    card = orch._take_tool_card(action_id, expected_kind=kind)
-    if card is None:
-        return
+    card, kind = resolved
 
     tool_result = getattr(event, 'tool_result', None)
     ok = tool_result.get('ok', True) if isinstance(tool_result, dict) else True
-    if session_id:
-        orch._pending_terminal_scan_cards[session_id] = card
-        if hasattr(orch, '_terminal_cards_by_session'):
-            orch._terminal_cards_by_session[session_id] = card
+    _remember_terminal_observation_card(orch, session_id, card)
 
-    if kind == 'terminal_run' and ok:
-        final_state = 'background'
-    else:
-        final_state = 'done' if ok else 'failed'
     orch._complete_terminal_scan_card(
         card,
         session_id=session_id,
         session_label=orch._terminal_session_label(session_id) or session_id,
         scrollback='\n'.join(orch._terminal_scrollback_by_session.get(session_id, [])),
-        state=final_state,
+        state=_terminal_observation_state(kind, ok),
     )

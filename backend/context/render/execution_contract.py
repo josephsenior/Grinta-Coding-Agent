@@ -57,46 +57,25 @@ def build_execution_contract_lines(
         snapshot = _load_snapshot_safe(state)
 
     task_state = _load_task_state_safe()
-    has_task_state = bool(
-        task_state is not None
-        and (
-            getattr(task_state, 'contract', None) is not None
-            or getattr(task_state, 'plan', None) is not None
-        )
-    )
+    has_task_state = _has_task_state(task_state)
 
     lines: list[str] = []
     if include_goal_header:
         lines.extend(render_goal_header(canonical))
 
     if has_task_state:
-        contract = getattr(task_state, 'contract', None)
-        objective = str(getattr(contract, 'objective', '') or '').strip()
-        if objective:
-            lines.append(f'- Recorded overall objective: {cap_line(objective, 320)}')
-        lines.append(_task_state_status_line(task_state))
+        lines.extend(_task_state_header_lines(task_state))
 
     task_plan = (
         _task_state_plan(task_state) if has_task_state else _resolve_task_plan(snapshot)
     )
-    header = '- Task plan:' if not only_open_tasks else '- Active scope:'
-    if task_plan is not None:
-        lines.extend(
-            render_task_plan(
-                task_plan,
-                only_open=only_open_tasks,
-                header=header,
-                show_empty=show_empty_states,
-            )
+    lines.extend(
+        _task_plan_lines(
+            task_plan,
+            only_open_tasks=only_open_tasks,
+            show_empty_states=show_empty_states,
         )
-    elif show_empty_states:
-        lines.extend(
-            render_task_plan(
-                [],
-                header=header,
-                show_empty=True,
-            )
-        )
+    )
 
     if has_task_state:
         lines.extend(
@@ -109,6 +88,44 @@ def build_execution_contract_lines(
     else:
         lines.extend(_acceptance_criteria_lines(show_empty=show_empty_states))
     return lines
+
+
+def _has_task_state(task_state: object | None) -> bool:
+    if task_state is None:
+        return False
+    return (
+        getattr(task_state, 'contract', None) is not None
+        or getattr(task_state, 'plan', None) is not None
+    )
+
+
+def _task_state_header_lines(task_state: object | None) -> list[str]:
+    contract = getattr(task_state, 'contract', None)
+    objective = str(getattr(contract, 'objective', '') or '').strip()
+    lines: list[str] = []
+    if objective:
+        lines.append(f'- Recorded overall objective: {cap_line(objective, 320)}')
+    lines.append(_task_state_status_line(task_state))
+    return lines
+
+
+def _task_plan_lines(
+    task_plan: dict[str, Any] | list[Any] | None,
+    *,
+    only_open_tasks: bool,
+    show_empty_states: bool,
+) -> list[str]:
+    header = '- Task plan:' if not only_open_tasks else '- Active scope:'
+    if task_plan is None:
+        if show_empty_states:
+            return render_task_plan([], header=header, show_empty=True)
+        return []
+    return render_task_plan(
+        task_plan,
+        only_open=only_open_tasks,
+        header=header,
+        show_empty=show_empty_states,
+    )
 
 
 def _load_task_state_safe() -> object | None:
@@ -139,26 +156,28 @@ def _task_state_plan(task_state: object | None) -> dict[str, Any] | None:
     }
 
 
+def _task_criterion_entry(item: object) -> dict[str, Any]:
+    evidence = getattr(item, 'evidence', None) or []
+    latest = evidence[-1] if evidence else None
+    return {
+        'id': str(getattr(item, 'id', '') or ''),
+        'assertion': (
+            f'[{str(getattr(item, "status", "unknown") or "unknown")}] '
+            f'{str(getattr(item, "text", "") or "")}'
+        ),
+        'evidence': str(getattr(latest, 'summary', '') or ''),
+    }
+
+
 def _task_state_criteria(task_state: object | None) -> list[dict[str, Any]]:
     contract = getattr(task_state, 'contract', None)
     if contract is None:
         return []
-    result: list[dict[str, Any]] = []
-    for field in ('requirements', 'constraints', 'success_conditions'):
-        for item in getattr(contract, field, []) or []:
-            evidence = getattr(item, 'evidence', None) or []
-            latest = evidence[-1] if evidence else None
-            result.append(
-                {
-                    'id': str(getattr(item, 'id', '') or ''),
-                    'assertion': (
-                        f'[{str(getattr(item, "status", "unknown") or "unknown")}] '
-                        f'{str(getattr(item, "text", "") or "")}'
-                    ),
-                    'evidence': str(getattr(latest, 'summary', '') or ''),
-                }
-            )
-    return result
+    return [
+        _task_criterion_entry(item)
+        for field in ('requirements', 'constraints', 'success_conditions')
+        for item in getattr(contract, field, []) or []
+    ]
 
 
 def _task_state_status_line(task_state: object) -> str:

@@ -163,6 +163,22 @@ def _build_tool_use_block(
     )
 
 
+def _collect_tool_use_blocks(
+    tool_calls: list[Any],
+    known_tool_ids: set[str],
+) -> list[dict[str, Any]]:
+    content_blocks: list[dict[str, Any]] = []
+    for tool_call in tool_calls:
+        if not isinstance(tool_call, dict):
+            continue
+        block, tool_id = _build_tool_use_block(tool_call)
+        if block is None or tool_id is None:
+            continue
+        known_tool_ids.add(tool_id)
+        content_blocks.append(block)
+    return content_blocks
+
+
 def _normalize_assistant_message(
     message: dict[str, Any],
     known_tool_ids: set[str],
@@ -176,14 +192,7 @@ def _normalize_assistant_message(
     if text:
         content_blocks.append({'type': 'text', 'text': text})
 
-    for tool_call in tool_calls:
-        if not isinstance(tool_call, dict):
-            continue
-        block, tool_id = _build_tool_use_block(tool_call)
-        if block is None or tool_id is None:
-            continue
-        known_tool_ids.add(tool_id)
-        content_blocks.append(block)
+    content_blocks.extend(_collect_tool_use_blocks(tool_calls, known_tool_ids))
 
     if not content_blocks:
         return None
@@ -279,6 +288,23 @@ def model_requires_anthropic_tool_schema(model: str) -> bool:
     )
 
 
+def _combinator_branch_shape(
+    branch: Any,
+) -> tuple[dict[str, Any], list[Any]]:
+    if not isinstance(branch, dict):
+        return {}, []
+    candidate = branch
+    then_branch = branch.get('then')
+    if 'if' in branch and isinstance(then_branch, dict):
+        candidate = then_branch
+    props = candidate.get('properties')
+    required = candidate.get('required')
+    return (
+        props if isinstance(props, dict) else {},
+        required if isinstance(required, list) else [],
+    )
+
+
 def _merge_combinator_branches(branches: Any) -> dict[str, Any]:
     if not isinstance(branches, list):
         return {}
@@ -286,18 +312,9 @@ def _merge_combinator_branches(branches: Any) -> dict[str, Any]:
     merged_props: dict[str, Any] = {}
     merged_required: list[str] = []
     for branch in branches:
-        if not isinstance(branch, dict):
-            continue
-        candidate = branch
-        then_branch = branch.get('then')
-        if 'if' in branch and isinstance(then_branch, dict):
-            candidate = then_branch
-        props = candidate.get('properties')
-        if isinstance(props, dict):
-            merged_props.update(props)
-        required = candidate.get('required')
-        if isinstance(required, list):
-            merged_required.extend(str(item) for item in required)
+        props, required = _combinator_branch_shape(branch)
+        merged_props.update(props)
+        merged_required.extend(str(item) for item in required)
 
     merged: dict[str, Any] = {}
     if merged_props:

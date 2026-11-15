@@ -213,6 +213,43 @@ def _host_active_agent_name(host: Any) -> str:
     return DEFAULT_AGENT_NAME
 
 
+def _apply_autonomy_host_config(host: Any, agent_name: str, new_level: str) -> None:
+    config = getattr(host, '_config', None)
+    if config is None:
+        return
+    try:
+        agent_config = config.get_agent_config(agent_name)
+        agent_config.autonomy_level = new_level
+        setattr(config, 'autonomy_level', new_level)
+    except Exception:
+        pass
+
+
+def _apply_autonomy_controller_runtime(
+    host: Any,
+    controller: Any,
+    ac: Any,
+    *,
+    new_level: str,
+    agent_name: str,
+    apply_to_controller: Any,
+) -> None:
+    ac.autonomy_level = new_level
+    _apply_autonomy_host_config(host, agent_name, new_level)
+    apply_to_controller(controller)
+    try:
+        from backend.core.logging.session_event_logger import (
+            emit_session_context_if_changed,
+        )
+
+        emit_session_context_if_changed()
+    except Exception:
+        pass
+    hud = getattr(host, '_hud', None)
+    if hud is not None and hasattr(hud, 'update_autonomy'):
+        hud.update_autonomy(new_level)
+
+
 def apply_autonomy_level(host: Any, new_level: str) -> None:
     from backend.cli.settings import get_persisted_autonomy_level, update_autonomy_level
     from backend.cli.settings.mode_runtime import apply_autonomy_to_controller
@@ -239,27 +276,14 @@ def apply_autonomy_level(host: Any, new_level: str) -> None:
     notice = autonomy_runtime_notice(new_level)
 
     if controller is not None and ac is not None:
-        ac.autonomy_level = new_level
-        config = getattr(host, '_config', None)
-        if config is not None:
-            try:
-                agent_config = config.get_agent_config(agent_name)
-                agent_config.autonomy_level = new_level
-                setattr(config, 'autonomy_level', new_level)
-            except Exception:
-                pass
-        apply_autonomy_to_controller(controller)
-        try:
-            from backend.core.logging.session_event_logger import (
-                emit_session_context_if_changed,
-            )
-
-            emit_session_context_if_changed()
-        except Exception:
-            pass
-        hud = getattr(host, '_hud', None)
-        if hud is not None and hasattr(hud, 'update_autonomy'):
-            hud.update_autonomy(new_level)
+        _apply_autonomy_controller_runtime(
+            host,
+            controller,
+            ac,
+            new_level=new_level,
+            agent_name=agent_name,
+            apply_to_controller=apply_autonomy_to_controller,
+        )
         if host._renderer is not None:
             host._renderer.add_system_message(notice, title='autonomy')
         return
@@ -362,12 +386,50 @@ def show_current_interaction_mode(host: Any, valid_modes: tuple[str, ...]) -> No
     )
 
 
-def apply_interaction_mode(host: Any, new_mode: str) -> None:
-    from backend.cli.settings import (
-        get_persisted_interaction_mode,
-        update_interaction_mode,
-    )
+def _interaction_mode_matches_runtime(host: Any, mode: str, agent_name: str) -> bool:
+    from backend.cli.settings import get_persisted_interaction_mode
+    from backend.core.interaction_modes import normalize_interaction_mode
+
+    if mode != get_persisted_interaction_mode(agent_name):
+        return False
+    controller = host._controller
+    if controller is None:
+        return False
+    agent = getattr(controller, 'agent', None)
+    running_config = getattr(agent, 'config', None) if agent is not None else None
+    if running_config is None:
+        return False
+    return normalize_interaction_mode(getattr(running_config, 'mode', None)) == mode
+
+
+def _apply_interaction_mode_to_config(host: Any, agent_name: str, mode: str) -> None:
+    config = getattr(host, '_config', None)
+    if config is None:
+        return
+    try:
+        agent_config = config.get_agent_config(agent_name)
+        agent_config.mode = mode
+    except Exception:
+        pass
+
+
+def _apply_interaction_mode_runtime(host: Any, mode: str, agent_name: str) -> None:
+    from backend.cli.settings import update_interaction_mode
     from backend.cli.settings.mode_runtime import apply_interaction_mode_to_controller
+
+    controller = getattr(host, '_controller', None)
+    if controller is not None:
+        apply_interaction_mode_to_controller(controller, mode)
+
+    update_interaction_mode(mode, agent_name)
+    hud = getattr(host, '_hud', None)
+    if hud is not None and hasattr(hud, 'update_interaction_mode'):
+        hud.update_interaction_mode(mode)
+    if host._renderer is not None:
+        host._renderer.add_system_message(f'Mode set to: {mode}', title='mode')
+
+
+def apply_interaction_mode(host: Any, new_mode: str) -> None:
     from backend.core.interaction_modes import (
         VISIBLE_INTERACTION_MODES,
         normalize_interaction_mode,
@@ -383,38 +445,11 @@ def apply_interaction_mode(host: Any, new_mode: str) -> None:
         return
 
     agent_name = _host_active_agent_name(host)
-    if mode == get_persisted_interaction_mode(agent_name):
-        controller = host._controller
-        if controller is not None:
-            agent = getattr(controller, 'agent', None)
-            running_config = (
-                getattr(agent, 'config', None) if agent is not None else None
-            )
-            if (
-                running_config is not None
-                and normalize_interaction_mode(getattr(running_config, 'mode', None))
-                == mode
-            ):
-                return
+    if _interaction_mode_matches_runtime(host, mode, agent_name):
+        return
 
-    config = getattr(host, '_config', None)
-    if config is not None:
-        try:
-            agent_config = config.get_agent_config(agent_name)
-            agent_config.mode = mode
-        except Exception:
-            pass
-
-    controller = getattr(host, '_controller', None)
-    if controller is not None:
-        apply_interaction_mode_to_controller(controller, mode)
-
-    update_interaction_mode(mode, agent_name)
-    hud = getattr(host, '_hud', None)
-    if hud is not None and hasattr(hud, 'update_interaction_mode'):
-        hud.update_interaction_mode(mode)
-    if host._renderer is not None:
-        host._renderer.add_system_message(f'Mode set to: {mode}', title='mode')
+    _apply_interaction_mode_to_config(host, agent_name, mode)
+    _apply_interaction_mode_runtime(host, mode, agent_name)
 
 
 def handle_interaction_mode_command(host: Any, parsed: Any) -> None:

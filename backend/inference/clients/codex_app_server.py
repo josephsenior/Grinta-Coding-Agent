@@ -95,6 +95,36 @@ def _content_text(content: Any) -> str:
     return '\n'.join(parts)
 
 
+def _image_content_parts(item: dict[str, Any]) -> list[dict[str, Any]]:
+    image_url = item.get('image_url')
+    if isinstance(image_url, dict):
+        image_url = image_url.get('url')
+    if not image_url:
+        parts: list[dict[str, Any]] = []
+        urls = item.get('image_urls')
+        if isinstance(urls, list):
+            for url in urls:
+                if url:
+                    parts.append({'type': 'input_image', 'image_url': str(url)})
+        return parts
+    return [{'type': 'input_image', 'image_url': str(image_url)}]
+
+
+def _content_item_parts(
+    item: Any, *, text_type: str, assistant: bool
+) -> list[dict[str, Any]]:
+    if isinstance(item, str):
+        return [{'type': text_type, 'text': item}] if item else []
+    if not isinstance(item, dict):
+        return []
+    text = item.get('text')
+    if isinstance(text, str) and text:
+        return [{'type': text_type, 'text': text}]
+    if assistant:
+        return []
+    return _image_content_parts(item)
+
+
 def _message_content_parts(content: Any, *, assistant: bool) -> list[dict[str, Any]]:
     text_type = 'output_text' if assistant else 'input_text'
     if isinstance(content, str):
@@ -105,30 +135,26 @@ def _message_content_parts(content: Any, *, assistant: bool) -> list[dict[str, A
 
     parts: list[dict[str, Any]] = []
     for item in content:
-        if isinstance(item, str):
-            if item:
-                parts.append({'type': text_type, 'text': item})
-            continue
-        if not isinstance(item, dict):
-            continue
-        text = item.get('text')
-        if isinstance(text, str) and text:
-            parts.append({'type': text_type, 'text': text})
-            continue
-        if assistant:
-            continue
-        image_url = item.get('image_url')
-        if isinstance(image_url, dict):
-            image_url = image_url.get('url')
-        if not image_url:
-            urls = item.get('image_urls')
-            if isinstance(urls, list):
-                for url in urls:
-                    if url:
-                        parts.append({'type': 'input_image', 'image_url': str(url)})
-            continue
-        parts.append({'type': 'input_image', 'image_url': str(image_url)})
+        parts.extend(
+            _content_item_parts(item, text_type=text_type, assistant=assistant)
+        )
     return parts
+
+
+def _function_call_input_item(tool_call: Any) -> dict[str, Any] | None:
+    if not isinstance(tool_call, dict):
+        return None
+    function = tool_call.get('function') or {}
+    call_id = tool_call.get('id')
+    name = function.get('name')
+    if not call_id or not name:
+        return None
+    return {
+        'type': 'function_call',
+        'call_id': str(call_id),
+        'name': str(name),
+        'arguments': str(function.get('arguments') or '{}'),
+    }
 
 
 def _responses_tools(tools: Any) -> list[dict[str, Any]]:
@@ -572,6 +598,18 @@ class CodexResponsesClient(DirectLLMClient):
         """Complete managed ChatGPT login and validate readable OAuth state."""
         self._credentials()
 
+    def _collect_listed_models(self, result: dict[str, Any], models: list[str]) -> None:
+        for item in result.get('data') or []:
+            if not isinstance(item, dict):
+                continue
+            model = str(item.get('model') or item.get('id') or '').strip()
+            if not model:
+                continue
+            if item.get('isDefault'):
+                self._default_model = model
+            if model not in models:
+                models.append(model)
+
     def list_available_models(self) -> list[str]:
         """Return this signed-in account's picker-visible Codex model ids."""
         with self._auth_lock:
@@ -583,22 +621,14 @@ class CodexResponsesClient(DirectLLMClient):
                 result = self._request(
                     'model/list', {'cursor': cursor, 'includeHidden': False}
                 )
-                for item in result.get('data') or []:
-                    if not isinstance(item, dict):
-                        continue
-                    model = str(item.get('model') or item.get('id') or '').strip()
-                    if not model:
-                        continue
-                    if item.get('isDefault'):
-                        self._default_model = model
-                    if model not in models:
-                        models.append(model)
+                self._collect_listed_models(result, models)
                 cursor_value = result.get('nextCursor')
                 cursor = str(cursor_value).strip() if cursor_value else None
-                if not cursor:
-                    if self._default_model is None and models:
-                        self._default_model = models[0]
-                    return models
+                if cursor:
+                    continue
+                if self._default_model is None and models:
+                    self._default_model = models[0]
+                return models
 
     def _credentials(self) -> tuple[str, str]:
         with self._auth_lock:
@@ -674,7 +704,7 @@ class CodexResponsesClient(DirectLLMClient):
         )
         self._notify('initialized', {})
 
-    def _start_chatgpt_login(self) -> None:
+    def _begin_chatgpt_login(self) -> str:
         login = self._request(
             'account/login/start',
             {
@@ -691,6 +721,9 @@ class CodexResponsesClient(DirectLLMClient):
             raise CodexAppServerError(
                 f'Open this URL to sign in with ChatGPT, then retry: {auth_url}'
             )
+        return login_id
+
+    def _await_chatgpt_login(self, login_id: str) -> None:
         while True:
             message = self._read()
             if message.get('method') != 'account/login/completed':
@@ -709,6 +742,10 @@ class CodexResponsesClient(DirectLLMClient):
             raise CodexAppServerError(
                 'ChatGPT sign-in completed, but Codex has no active ChatGPT account.'
             )
+
+    def _start_chatgpt_login(self) -> None:
+        login_id = self._begin_chatgpt_login()
+        self._await_chatgpt_login(login_id)
 
     def _resolved_model_name(self) -> str:
         if self._model_name != 'default':
@@ -786,6 +823,43 @@ class CodexResponsesClient(DirectLLMClient):
             payload['timeout'] = kwargs['timeout']
         return payload
 
+    @staticmethod
+    def _tool_output_input_item(message: dict[str, Any]) -> dict[str, Any] | None:
+        call_id = message.get('tool_call_id') or message.get('id')
+        if not call_id:
+            return None
+        return {
+            'type': 'function_call_output',
+            'call_id': str(call_id),
+            'output': _content_text(message.get('content')),
+        }
+
+    @staticmethod
+    def _message_input_item(
+        role: str,
+        message: dict[str, Any],
+        *,
+        assistant: bool,
+    ) -> dict[str, Any] | None:
+        content = _message_content_parts(message.get('content'), assistant=assistant)
+        if not content:
+            return None
+        return {'type': 'message', 'role': role, 'content': content}
+
+    def _assistant_input_items(self, message: dict[str, Any]) -> list[dict[str, Any]]:
+        items: list[dict[str, Any]] = []
+        tool_calls = message.get('tool_calls')
+        if isinstance(tool_calls, list) and tool_calls:
+            self._append_reasoning_replay(items, tool_calls)
+            for tool_call in tool_calls:
+                item = _function_call_input_item(tool_call)
+                if item is not None:
+                    items.append(item)
+        content_item = self._message_input_item('assistant', message, assistant=True)
+        if content_item is not None:
+            items.append(content_item)
+        return items
+
     def _messages_to_responses_input(
         self, messages: list[dict[str, Any]]
     ) -> tuple[str, list[dict[str, Any]]]:
@@ -800,49 +874,18 @@ class CodexResponsesClient(DirectLLMClient):
                 continue
 
             if role == 'tool':
-                call_id = message.get('tool_call_id') or message.get('id')
-                if call_id:
-                    input_items.append(
-                        {
-                            'type': 'function_call_output',
-                            'call_id': str(call_id),
-                            'output': _content_text(message.get('content')),
-                        }
-                    )
+                tool_output = self._tool_output_input_item(message)
+                if tool_output is not None:
+                    input_items.append(tool_output)
                 continue
 
             if role == 'assistant':
-                tool_calls = message.get('tool_calls')
-                if isinstance(tool_calls, list) and tool_calls:
-                    self._append_reasoning_replay(input_items, tool_calls)
-                    for tool_call in tool_calls:
-                        if not isinstance(tool_call, dict):
-                            continue
-                        function = tool_call.get('function') or {}
-                        call_id = tool_call.get('id')
-                        name = function.get('name')
-                        if not call_id or not name:
-                            continue
-                        input_items.append(
-                            {
-                                'type': 'function_call',
-                                'call_id': str(call_id),
-                                'name': str(name),
-                                'arguments': str(function.get('arguments') or '{}'),
-                            }
-                        )
-                content = _message_content_parts(message.get('content'), assistant=True)
-                if content:
-                    input_items.append(
-                        {'type': 'message', 'role': 'assistant', 'content': content}
-                    )
+                input_items.extend(self._assistant_input_items(message))
                 continue
 
-            content = _message_content_parts(message.get('content'), assistant=False)
-            if content:
-                input_items.append(
-                    {'type': 'message', 'role': 'user', 'content': content}
-                )
+            user_item = self._message_input_item('user', message, assistant=False)
+            if user_item is not None:
+                input_items.append(user_item)
         return '\n\n'.join(instructions), input_items
 
     def _append_reasoning_replay(
@@ -970,25 +1013,41 @@ class CodexResponsesClient(DirectLLMClient):
                 },
             )
 
-    def _cache_reasoning_items(
-        self,
-        output: Any,
-        *,
-        call_ids: list[str] | None = None,
-        extra_reasoning: list[dict[str, Any]] | None = None,
+    @staticmethod
+    def _append_reasoning_replay_item(
+        item: Any,
+        reasoning_items: list[dict[str, Any]],
     ) -> None:
-        reasoning_items = list(extra_reasoning or [])
-        discovered_call_ids = list(call_ids or [])
+        replay = _reasoning_replay_item(item)
+        if replay is not None and replay not in reasoning_items:
+            reasoning_items.append(replay)
+
+    @staticmethod
+    def _function_call_item_id(item: Any) -> str:
+        return str(_get(item, 'call_id') or _get(item, 'id') or '')
+
+    @staticmethod
+    def _collect_reasoning_replay(
+        output: Any,
+        reasoning_items: list[dict[str, Any]],
+        discovered_call_ids: list[str],
+    ) -> None:
         for item in output or []:
             item_type = _get(item, 'type')
             if item_type == 'reasoning':
-                replay = _reasoning_replay_item(item)
-                if replay is not None and replay not in reasoning_items:
-                    reasoning_items.append(replay)
+                CodexResponsesClient._append_reasoning_replay_item(
+                    item, reasoning_items
+                )
             elif item_type == 'function_call':
-                call_id = str(_get(item, 'call_id') or _get(item, 'id') or '')
+                call_id = CodexResponsesClient._function_call_item_id(item)
                 if call_id and call_id not in discovered_call_ids:
                     discovered_call_ids.append(call_id)
+
+    def _store_reasoning_items(
+        self,
+        reasoning_items: list[dict[str, Any]],
+        discovered_call_ids: list[str],
+    ) -> None:
         if not reasoning_items:
             return
         for call_id in discovered_call_ids:
@@ -998,6 +1057,22 @@ class CodexResponsesClient(DirectLLMClient):
             self._reasoning_by_call_id.move_to_end(call_id)
         while len(self._reasoning_by_call_id) > _MAX_REASONING_REPLAY_ENTRIES:
             self._reasoning_by_call_id.popitem(last=False)
+
+    def _cache_reasoning_items(
+        self,
+        output: Any,
+        *,
+        call_ids: list[str] | None = None,
+        extra_reasoning: list[dict[str, Any]] | None = None,
+    ) -> None:
+        reasoning_items = list(extra_reasoning or [])
+        discovered_call_ids = list(call_ids or [])
+        self._collect_reasoning_replay(
+            output,
+            reasoning_items,
+            discovered_call_ids,
+        )
+        self._store_reasoning_items(reasoning_items, discovered_call_ids)
 
     @staticmethod
     def _tool_call_chunk(

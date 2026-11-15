@@ -149,6 +149,29 @@ class ActionService:
 
         self._prepare_metrics_for_action(action)
 
+        self._run_file_edit_transaction_preflight(controller, action)
+
+        # Lifecycle state for agent message handoffs is decided by the router
+        # after protocol validation.
+        await _set_waiting_message_state_if_needed(controller, action)
+
+        if _should_defer_stream_emission_until_confirmed(action):
+            self._emit_deferred_action(controller, action, ctx)
+            return
+
+        es = controller.event_stream
+        await self._emit_action_to_event_stream(controller, action, es)
+
+        # MagicMock event streams do not run EventStream's pre-dispatch hook, so
+        # keep tests and lightweight fakes on the old post-add path.
+        if action.runnable and not isinstance(es, EventStream):
+            self.set_pending_action(action)  # type: ignore[unreachable]
+
+        _bind_action_context_if_present(controller, action, ctx)
+
+        self._log_action_emission(controller, action)
+
+    def _run_file_edit_transaction_preflight(self, controller, action: Action) -> None:
         try:
             from backend.orchestration.file_edits.file_edit_transaction import (
                 get_file_edit_transaction_coordinator,
@@ -162,18 +185,16 @@ class ActionService:
                 extra={'msg_type': 'FILE_EDIT_TRANSACTION_PRECHECK_FAILED'},
             )
 
-        # Lifecycle state for agent message handoffs is decided by the router
-        # after protocol validation.
-        await _set_waiting_message_state_if_needed(controller, action)
+    def _emit_deferred_action(
+        self, controller, action: Action, ctx: ToolInvocationContext | None
+    ) -> None:
+        self.set_pending_action(action)
+        _bind_action_context_if_present(controller, action, ctx)
+        self._log_action_emission(controller, action)
 
-        if _should_defer_stream_emission_until_confirmed(action):
-            self.set_pending_action(action)
-            _bind_action_context_if_present(controller, action, ctx)
-            log_level = 'info' if LOG_ALL_EVENTS else 'debug'
-            controller.log(log_level, str(action), extra={'msg_type': 'ACTION'})
-            return
-
-        es = controller.event_stream
+    async def _emit_action_to_event_stream(
+        self, controller, action: Action, es
+    ) -> None:
         previous_hook: object | None = None
         if action.runnable and isinstance(es, EventStream):
             lock = es.pre_dispatch_lock()
@@ -190,13 +211,7 @@ class ActionService:
                 action, action.source or EventSource.AGENT
             )
 
-        # MagicMock event streams do not run EventStream's pre-dispatch hook, so
-        # keep tests and lightweight fakes on the old post-add path.
-        if action.runnable and not isinstance(es, EventStream):
-            self.set_pending_action(action)  # type: ignore[unreachable]
-
-        _bind_action_context_if_present(controller, action, ctx)
-
+    def _log_action_emission(self, controller, action: Action) -> None:
         log_level = 'info' if LOG_ALL_EVENTS else 'debug'
         controller.log(log_level, str(action), extra={'msg_type': 'ACTION'})
 

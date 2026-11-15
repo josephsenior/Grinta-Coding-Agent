@@ -349,6 +349,27 @@ def get_full_working_memory() -> str:
     return '\n'.join(parts)
 
 
+def _fit_working_memory_section(
+    sec: str,
+    val: str,
+    *,
+    section_budget: int,
+    char_budget: int,
+    lines: list[str],
+) -> tuple[str, str, bool]:
+    clipped = _clip_section(val.strip(), section_budget)
+    line = f'[{sec.upper()}]\n{clipped}'
+    while len('\n'.join(lines + [line, '</WORKING_MEMORY>'])) > char_budget:
+        reduced = max(160, len(clipped) // 2)
+        if reduced >= len(clipped):
+            return line, clipped, True
+        clipped = _clip_section(clipped, reduced)
+        line = f'[{sec.upper()}]\n{clipped}'
+    if len('\n'.join(lines + [line, '</WORKING_MEMORY>'])) > char_budget:
+        return line, clipped, True
+    return line, clipped, False
+
+
 def get_working_memory_prompt_block(char_budget: int = 2000) -> str:
     """Return a bounded working-memory block for prompt or recovery injection."""
     memory = _load_memory()
@@ -362,16 +383,14 @@ def get_working_memory_prompt_block(char_budget: int = 2000) -> str:
         val = memory.get(sec, '')
         if not isinstance(val, str) or not val.strip():
             continue
-        clipped = _clip_section(val.strip(), section_budget)
-        line = f'[{sec.upper()}]\n{clipped}'
-        while len('\n'.join(lines + [line, '</WORKING_MEMORY>'])) > char_budget:
-            reduced = max(160, len(clipped) // 2)
-            if reduced >= len(clipped):
-                truncated = True
-                break
-            clipped = _clip_section(clipped, reduced)
-            line = f'[{sec.upper()}]\n{clipped}'
-        if len('\n'.join(lines + [line, '</WORKING_MEMORY>'])) > char_budget:
+        line, clipped, overflow = _fit_working_memory_section(
+            sec,
+            val,
+            section_budget=section_budget,
+            char_budget=char_budget,
+            lines=lines,
+        )
+        if overflow:
             truncated = True
             break
         lines.append(line)

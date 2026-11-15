@@ -153,6 +153,62 @@ def _facts_are_similar(fact1: str, fact2: str) -> bool:
     return (intersection / union) >= 0.65
 
 
+def _find_similar_active_entry(
+    entries: list[ProjectMemoryEntry], fact: str
+) -> ProjectMemoryEntry | None:
+    for entry in entries:
+        if entry.status == 'active' and _facts_are_similar(entry.fact, fact):
+            return entry
+    return None
+
+
+def _merge_candidate_entry(
+    existing: ProjectMemoryEntry,
+    evidence: list[str],
+    source_session: str | None,
+    confidence: float,
+    now: str,
+) -> None:
+    existing.last_verified = now
+    for ev in evidence:
+        if ev not in existing.evidence:
+            existing.evidence.append(ev)
+    if source_session and source_session not in existing.source_sessions:
+        existing.source_sessions.append(source_session)
+    existing.confidence = max(existing.confidence, confidence)
+
+
+def _next_memory_id(entries: list[ProjectMemoryEntry]) -> str:
+    max_num = 0
+    for entry in entries:
+        match = re.match(r'mem-(\d+)', entry.id)
+        if match:
+            max_num = max(max_num, int(match.group(1)))
+    return f'mem-{max_num + 1:03d}'
+
+
+def _new_memory_entry(
+    entry_id: str,
+    kind: str,
+    fact: str,
+    evidence: list[str],
+    now: str,
+    confidence: float,
+    source_session: str | None,
+) -> ProjectMemoryEntry:
+    return ProjectMemoryEntry(
+        id=entry_id,
+        kind=kind,
+        status='active',
+        fact=fact,
+        evidence=evidence,
+        created=now,
+        last_verified=now,
+        confidence=confidence,
+        source_sessions=[source_session] if source_session else [],
+    )
+
+
 class ProjectMemoryService:
     """Service to load, save, and upsert canonical project memories."""
 
@@ -205,45 +261,26 @@ class ProjectMemoryService:
         now = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
         evidence = evidence or []
 
-        # Find existing active entry with similar fact
-        existing = None
-        for entry in entries:
-            if entry.status == 'active' and _facts_are_similar(entry.fact, fact):
-                existing = entry
-                break
-
-        if existing:
-            existing.last_verified = now
-            for ev in evidence:
-                if ev not in existing.evidence:
-                    existing.evidence.append(ev)
-            if source_session and source_session not in existing.source_sessions:
-                existing.source_sessions.append(source_session)
-            existing.confidence = max(existing.confidence, confidence)
+        existing = _find_similar_active_entry(entries, fact)
+        if existing is not None:
+            _merge_candidate_entry(existing, evidence, source_session, confidence, now)
             self.save(entries)
             return existing.id
-        else:
-            max_num = 0
-            for entry in entries:
-                match = re.match(r'mem-(\d+)', entry.id)
-                if match:
-                    max_num = max(max_num, int(match.group(1)))
-            next_id = f'mem-{max_num + 1:03d}'
 
-            new_entry = ProjectMemoryEntry(
-                id=next_id,
-                kind=kind,
-                status='active',
-                fact=fact,
-                evidence=evidence,
-                created=now,
-                last_verified=now,
-                confidence=confidence,
-                source_sessions=[source_session] if source_session else [],
+        next_id = _next_memory_id(entries)
+        entries.append(
+            _new_memory_entry(
+                next_id,
+                kind,
+                fact,
+                evidence,
+                now,
+                confidence,
+                source_session,
             )
-            entries.append(new_entry)
-            self.save(entries)
-            return next_id
+        )
+        self.save(entries)
+        return next_id
 
     def supersede_entry(self, entry_id: str, superseded_by_id: str) -> bool:
         entries = self.load()

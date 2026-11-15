@@ -172,17 +172,29 @@ def _map_html_api_error(client: Any, exc: Exception, raw_msg: str) -> Exception:
     )
 
 
+def _rate_limit_body_details(
+    body: Any,
+    code: Any,
+    message: str,
+) -> tuple[Any, str]:
+    if not isinstance(body, dict):
+        return code, message
+    err = body.get('error')
+    if not isinstance(err, dict):
+        return code, message
+    code = err.get('code') or err.get('type') or code
+    body_msg = err.get('message')
+    if isinstance(body_msg, str) and body_msg:
+        message = body_msg
+    return code, message
+
+
 def _rate_limit_error_details(exc: Exception) -> tuple[str, Any, Any, int]:
     code = getattr(exc, 'code', None)
     message = str(exc)
     body = getattr(exc, 'body', None)
-    if not code and isinstance(body, dict):
-        err = body.get('error')
-        if isinstance(err, dict):
-            code = err.get('code') or err.get('type') or code
-            body_msg = err.get('message')
-            if isinstance(body_msg, str) and body_msg:
-                message = body_msg
+    if not code:
+        code, message = _rate_limit_body_details(body, code, message)
 
     status_code = getattr(exc, 'status_code', None) or 429
     if isinstance(code, str) and code and f'code={code}' not in message:
@@ -237,7 +249,7 @@ def _map_bad_request_error(client: Any, exc: Exception) -> Exception:
     )
 
 
-def map_openai_error(client: Any, exc: Exception) -> Exception:
+def _map_openai_sdk_error(client: Any, exc: Exception) -> Exception | None:
     import httpx
     import openai
 
@@ -247,24 +259,10 @@ def map_openai_error(client: Any, exc: Exception) -> Exception:
         InternalServerError,
         NotFoundError,
         Timeout,
-        is_html_api_body,
     )
     from backend.inference.exceptions import (
         APIError as ProviderAPIError,
     )
-
-    raw_msg = str(exc)
-    if is_html_api_body(raw_msg):
-        return _map_html_api_error(client, exc, raw_msg)
-
-    status_from_wire = extract_openai_http_status(exc)
-    if status_from_wire in (401, 403):
-        return AuthenticationError(
-            simplify_openai_unauthorized_message(exc, status_from_wire),
-            llm_provider='openai',
-            model=client.model_name,
-            status_code=status_from_wire,
-        )
 
     if isinstance(exc, (openai.APITimeoutError, httpx.TimeoutException)):
         return Timeout(str(exc), llm_provider='openai', model=client.model_name)
@@ -293,7 +291,30 @@ def map_openai_error(client: Any, exc: Exception) -> Exception:
             model=client.model_name,
             status_code=exc.status_code,
         )
-    return exc
+    return None
+
+
+def map_openai_error(client: Any, exc: Exception) -> Exception:
+    from backend.inference.exceptions import (
+        AuthenticationError,
+        is_html_api_body,
+    )
+
+    raw_msg = str(exc)
+    if is_html_api_body(raw_msg):
+        return _map_html_api_error(client, exc, raw_msg)
+
+    status_from_wire = extract_openai_http_status(exc)
+    if status_from_wire in (401, 403):
+        return AuthenticationError(
+            simplify_openai_unauthorized_message(exc, status_from_wire),
+            llm_provider='openai',
+            model=client.model_name,
+            status_code=status_from_wire,
+        )
+
+    mapped = _map_openai_sdk_error(client, exc)
+    return mapped if mapped is not None else exc
 
 
 def strip_unsupported_params(profile: Any, kwargs: dict[str, Any]) -> dict[str, Any]:
@@ -380,6 +401,26 @@ def _flatten_stale_deepseek_tool_message(msg: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _recover_deepseek_message(msg: Any) -> Any:
+    if not isinstance(msg, dict):
+        return msg
+    role = msg.get('role')
+    if role == 'assistant' and not msg.get('reasoning_content'):
+        return _flatten_stale_deepseek_assistant_message(msg)
+    if role == 'tool':
+        return _flatten_stale_deepseek_tool_message(msg)
+    return msg
+
+
+def _has_stale_deepseek_assistant(messages: list[dict[str, Any]]) -> bool:
+    return any(
+        isinstance(msg, dict)
+        and msg.get('role') == 'assistant'
+        and not msg.get('reasoning_content')
+        for msg in messages
+    )
+
+
 def _recover_deepseek_thinking_history(
     client: Any,
     messages: list[dict[str, Any]],
@@ -388,29 +429,10 @@ def _recover_deepseek_thinking_history(
     if not _is_deepseek_thinking_replay_model(client):
         return messages
 
-    has_stale_assistant = any(
-        isinstance(msg, dict)
-        and msg.get('role') == 'assistant'
-        and not msg.get('reasoning_content')
-        for msg in messages
-    )
-    if not has_stale_assistant:
+    if not _has_stale_deepseek_assistant(messages):
         return messages
 
-    recovered: list[dict[str, Any]] = []
-    for msg in messages:
-        if not isinstance(msg, dict):
-            recovered.append(msg)  # type: ignore[unreachable]
-            continue  # type: ignore[unreachable]
-        role = msg.get('role')
-        if role == 'assistant' and not msg.get('reasoning_content'):
-            recovered.append(_flatten_stale_deepseek_assistant_message(msg))
-            continue
-        if role == 'tool':
-            recovered.append(_flatten_stale_deepseek_tool_message(msg))
-            continue
-        recovered.append(msg)
-    return recovered
+    return [_recover_deepseek_message(msg) for msg in messages]
 
 
 def _prepare_openai_compatible_messages(
@@ -548,26 +570,25 @@ async def acompletion(client: Any, messages: list[dict[str, Any]], **kwargs) -> 
     )
 
 
+def _reasoning_detail_text(item: Any) -> str:
+    if isinstance(item, str):
+        return item
+    if not isinstance(item, dict):
+        return ''
+    detail_type = str(item.get('type') or '').lower()
+    if 'encrypted' in detail_type:
+        return ''
+    for key in ('text', 'summary', 'content'):
+        value = item.get(key)
+        if isinstance(value, str) and value:
+            return value
+    return ''
+
+
 def _reasoning_details_text(details: Any) -> str:
     if not isinstance(details, list):
         return ''
-    parts: list[str] = []
-    for item in details:
-        if isinstance(item, str):
-            if item:
-                parts.append(item)
-            continue
-        if not isinstance(item, dict):
-            continue
-        detail_type = str(item.get('type') or '').lower()
-        if 'encrypted' in detail_type:
-            continue
-        for key in ('text', 'summary', 'content'):
-            value = item.get(key)
-            if isinstance(value, str) and value:
-                parts.append(value)
-                break
-    return ''.join(parts)
+    return ''.join(_reasoning_detail_text(item) for item in details)
 
 
 def _coalesce_stream_delta_reasoning(delta: dict[str, Any]) -> dict[str, Any]:

@@ -161,34 +161,43 @@ class FileEditorEditOpsMixin:
         return None
 
     @staticmethod
+    def _content_context_line_numbers(msg: str) -> set[int]:
+        try:
+            import re as _re
+
+            return {
+                int(match.group(1))
+                for match in _re.finditer(r'(?i)\bline\s+(\d{1,6})\b', msg)
+            }
+        except Exception:
+            return set()
+
+    @staticmethod
+    def _content_excerpt(lines: list[str], line_no: int, radius: int) -> str:
+        start = max(1, line_no - radius)
+        end = min(len(lines), line_no + radius)
+        width = len(str(end))
+        block = [f'  [line {line_no} — excerpt]']
+        for index in range(start, end + 1):
+            marker = '>>' if index == line_no else '  '
+            block.append(f'  {marker} {index:>{width}} | {lines[index - 1]}')
+        return '\n'.join(block)
+
+    @staticmethod
     def _attach_content_context(msg: str, content: str, *, radius: int = 2) -> str:
         if not msg or not content:
             return msg
         lines = content.splitlines()
         if len(lines) < 3:
             return msg
-        try:
-            import re as _re
-
-            nums = {
-                int(match.group(1))
-                for match in _re.finditer(r'(?i)\bline\s+(\d{1,6})\b', msg)
-            }
-        except Exception:
-            return msg
+        nums = FileEditorEditOpsMixin._content_context_line_numbers(msg)
         if not nums:
             return msg
 
-        excerpts: list[str] = []
-        for line_no in sorted(nums)[:5]:
-            start = max(1, line_no - radius)
-            end = min(len(lines), line_no + radius)
-            width = len(str(end))
-            block = [f'  [line {line_no} — excerpt]']
-            for index in range(start, end + 1):
-                marker = '>>' if index == line_no else '  '
-                block.append(f'  {marker} {index:>{width}} | {lines[index - 1]}')
-            excerpts.append('\n'.join(block))
+        excerpts = [
+            FileEditorEditOpsMixin._content_excerpt(lines, line_no, radius)
+            for line_no in sorted(nums)[:5]
+        ]
         if not excerpts:
             return msg
         return msg + '\n\nContent context:\n' + '\n\n'.join(excerpts)

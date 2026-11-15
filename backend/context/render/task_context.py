@@ -42,6 +42,34 @@ def _task_description(task: dict[str, Any]) -> str:
     return ''
 
 
+def _task_plan_items(tasks: object) -> list[dict[str, Any]]:
+    if isinstance(tasks, dict):
+        raw = tasks.get('tasks')
+        if isinstance(raw, list):
+            return [item for item in raw if isinstance(item, dict)]
+        return []
+    if isinstance(tasks, list):
+        return [item for item in tasks if isinstance(item, dict)]
+    return []
+
+
+def _render_task_plan_item(
+    task: dict[str, Any],
+    *,
+    only_open: bool,
+    desc_limit: int,
+) -> str | None:
+    status = str(task.get('status', '') or '').strip().lower()
+    if only_open and status in _DONE_STATUSES:
+        return None
+    desc = _task_description(task)
+    if not desc:
+        return None
+    task_id = str(task.get('id', '') or '').strip()
+    id_part = f' (id={task_id})' if task_id else ''
+    return f'  - [{status or "?"}]{id_part} {cap_line(desc, desc_limit)}'
+
+
 def render_task_plan(
     tasks: object,
     *,
@@ -53,13 +81,7 @@ def render_task_plan(
     empty_hint: str = EMPTY_TASK_PLAN_HINT,
 ) -> list[str]:
     """Render task plan bullets with stable ids from snapshot dict or task list."""
-    task_items: list[dict[str, Any]] = []
-    if isinstance(tasks, dict):
-        raw = tasks.get('tasks')
-        if isinstance(raw, list):
-            task_items = [item for item in raw if isinstance(item, dict)]
-    elif isinstance(tasks, list):
-        task_items = [item for item in tasks if isinstance(item, dict)]
+    task_items = _task_plan_items(tasks)
 
     if not task_items:
         if show_empty:
@@ -68,15 +90,14 @@ def render_task_plan(
 
     lines = [header]
     for task in task_items[:max_items]:
-        status = str(task.get('status', '') or '').strip().lower()
-        if only_open and status in _DONE_STATUSES:
+        line = _render_task_plan_item(
+            task,
+            only_open=only_open,
+            desc_limit=desc_limit,
+        )
+        if line is None:
             continue
-        desc = _task_description(task)
-        if not desc:
-            continue
-        task_id = str(task.get('id', '') or '').strip()
-        id_part = f' (id={task_id})' if task_id else ''
-        lines.append(f'  - [{status or "?"}]{id_part} {cap_line(desc, desc_limit)}')
+        lines.append(line)
     if len(lines) > 1:
         return lines
     if show_empty:
@@ -118,19 +139,27 @@ def render_acceptance_gates(
         return []
     lines = [header]
     for item in criteria[:max_items]:
-        if not isinstance(item, dict):
-            continue
-        assertion = str(item.get('assertion', '') or '').strip()
-        if not assertion:
-            continue
-        evidence = str(item.get('evidence', '') or '').strip()
-        suffix = (
-            f' (evidence: {cap_line(evidence, evidence_limit)})' if evidence else ''
-        )
-        criterion_id = str(item.get('id', '') or '').strip()
-        label = f'[{criterion_id}] ' if criterion_id else ''
-        lines.append(f'  - {label}{cap_line(assertion, assertion_limit)}{suffix}')
+        line = _acceptance_gate_line(item, assertion_limit, evidence_limit)
+        if line:
+            lines.append(line)
     return lines if len(lines) > 1 else []
+
+
+def _acceptance_gate_line(
+    item: object,
+    assertion_limit: int,
+    evidence_limit: int,
+) -> str | None:
+    if not isinstance(item, dict):
+        return None
+    assertion = str(item.get('assertion', '') or '').strip()
+    if not assertion:
+        return None
+    evidence = str(item.get('evidence', '') or '').strip()
+    suffix = f' (evidence: {cap_line(evidence, evidence_limit)})' if evidence else ''
+    criterion_id = str(item.get('id', '') or '').strip()
+    label = f'[{criterion_id}] ' if criterion_id else ''
+    return f'  - {label}{cap_line(assertion, assertion_limit)}{suffix}'
 
 
 __all__ = [

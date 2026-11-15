@@ -331,14 +331,51 @@ def explore_context(
     mentions = _mentioned_paths(task)
     drafts: dict[str, _CandidateDraft] = {}
 
+    _add_mention_drafts(drafts, files, mentions)
+    _add_dirty_drafts(drafts, dirty, file_set)
+    _add_path_match_drafts(drafts, files, term_set)
+    _add_content_match_drafts(drafts, root, terms)
+
+    top_drafts = sorted(
+        drafts.values(),
+        key=lambda item: (-item.score, item.path),
+    )[: max(max_candidates * 3, max_candidates)]
+    _attach_matching_symbols(top_drafts, root, term_set)
+    candidates = _select_candidates(top_drafts, max_candidates)
+
+    return ContextExplorerResult(
+        workspace=str(root),
+        dirty_files=tuple(sorted(dirty)[:18]),
+        candidates=candidates,
+        query_terms=tuple(terms),
+    )
+
+
+def _add_mention_drafts(
+    drafts: dict[str, _CandidateDraft],
+    files: list[str],
+    mentions: set[str],
+) -> None:
     for mentioned in mentions:
         for path in files:
             if path == mentioned or path.endswith('/' + mentioned):
                 _draft_for(drafts, path).add(90, 'mentioned in task')
 
+
+def _add_dirty_drafts(
+    drafts: dict[str, _CandidateDraft],
+    dirty: set[str],
+    file_set: set[str],
+) -> None:
     for path in sorted(dirty & file_set):
         _draft_for(drafts, path).add(24, 'dirty file')
 
+
+def _add_path_match_drafts(
+    drafts: dict[str, _CandidateDraft],
+    files: list[str],
+    term_set: set[str],
+) -> None:
     for path in files:
         overlap = _path_tokens(path) & term_set
         if not overlap:
@@ -346,10 +383,15 @@ def explore_context(
         points = min(28, len(overlap) * 7)
         draft = _draft_for(drafts, path)
         draft.add(points, 'path matches ' + ', '.join(sorted(overlap)[:3]))
-        stem = Path(path).stem.lower()
-        if stem in term_set:
+        if Path(path).stem.lower() in term_set:
             draft.add(10, 'filename stem matches task')
 
+
+def _add_content_match_drafts(
+    drafts: dict[str, _CandidateDraft],
+    root: Path,
+    terms: list[str],
+) -> None:
     for path, matched_terms in _content_hits(root, terms).items():
         draft = _draft_for(drafts, path)
         draft.add(
@@ -357,18 +399,24 @@ def explore_context(
             'content matches ' + ', '.join(sorted(matched_terms)[:3]),
         )
 
-    top_drafts = sorted(
-        drafts.values(),
-        key=lambda item: (-item.score, item.path),
-    )[: max(max_candidates * 3, max_candidates)]
 
+def _attach_matching_symbols(
+    top_drafts: list[_CandidateDraft],
+    root: Path,
+    term_set: set[str],
+) -> None:
     for draft in top_drafts:
         symbols = _collect_python_symbols(root / draft.path, term_set)
         if symbols:
             draft.symbols.extend(symbols)
             draft.add(8, 'matching symbols')
 
-    candidates = tuple(
+
+def _select_candidates(
+    top_drafts: list[_CandidateDraft],
+    max_candidates: int,
+) -> tuple[ContextCandidate, ...]:
+    return tuple(
         ContextCandidate(
             path=draft.path,
             score=draft.score,
@@ -379,13 +427,6 @@ def explore_context(
             :max_candidates
         ]
         if draft.score > 0
-    )
-
-    return ContextExplorerResult(
-        workspace=str(root),
-        dirty_files=tuple(sorted(dirty)[:18]),
-        candidates=candidates,
-        query_terms=tuple(terms),
     )
 
 

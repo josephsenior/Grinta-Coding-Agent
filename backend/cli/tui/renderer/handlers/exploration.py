@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from backend.cli.tool_display.orient_tools import (
     OrientLineModel,
@@ -110,20 +110,18 @@ def _handle_lsp_query_observation(
     orch._pending_lsp_file = ''
 
 
-def _show_lsp_install_hint(orch: 'RendererEventProcessorMixin') -> None:
-    """Show a non-persistent toast with install instructions for a missing LSP server."""
+def _resolve_lsp_hint_language(orch: 'RendererEventProcessorMixin') -> str | None:
     from pathlib import Path as _Path
 
     from backend.utils.lsp.lsp_project_routing import resolve_language_key
-    from backend.utils.runtime_detect import CANONICAL_LSP_SERVERS
 
     file_path = getattr(orch, '_pending_lsp_file', '') or ''
     if not file_path:
-        return
+        return None
 
     suffix = _Path(file_path).suffix.lower()
     if not suffix:
-        return
+        return None
 
     try:
         from backend.utils.lsp.lsp_project_routing import find_project_root
@@ -132,20 +130,35 @@ def _show_lsp_install_hint(orch: 'RendererEventProcessorMixin') -> None:
         lang_key = resolve_language_key(suffix, root)
     except Exception:
         lang_key = None
+    return lang_key or None
 
+
+def _claim_lsp_install_notification(
+    orch: 'RendererEventProcessorMixin', lang_key: str
+) -> Any | None:
+    tui = getattr(orch, '_tui', None)
+    if tui is None:
+        return None
+    notified = getattr(tui, '_lsp_notified_languages', None)
+    if notified is None:
+        return None
+    if lang_key in notified:
+        return None
+    notified.add(lang_key)
+    return tui
+
+
+def _show_lsp_install_hint(orch: 'RendererEventProcessorMixin') -> None:
+    """Show a non-persistent toast with install instructions for a missing LSP server."""
+    from backend.utils.runtime_detect import CANONICAL_LSP_SERVERS
+
+    lang_key = _resolve_lsp_hint_language(orch)
     if not lang_key:
         return
 
-    # Session-level dedup: don't notify twice for the same language
-    tui = getattr(orch, '_tui', None)
+    tui = _claim_lsp_install_notification(orch, lang_key)
     if tui is None:
         return
-    notified = getattr(tui, '_lsp_notified_languages', None)
-    if notified is None:
-        return
-    if lang_key in notified:
-        return
-    notified.add(lang_key)
 
     spec = CANONICAL_LSP_SERVERS.get(lang_key)
     if spec is None or not spec.install_hint:

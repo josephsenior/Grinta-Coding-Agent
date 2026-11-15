@@ -407,11 +407,33 @@ def cmd_search(host: Any, parsed: Any) -> bool:
     return True
 
 
+def _render_specific_help(host: Any, command_name: str) -> bool:
+    from backend.cli.repl.slash_registry_help import build_help_markdown
+
+    help_text = build_help_markdown(command_name)
+    if host._renderer is not None:
+        host._renderer.add_markdown_block('Help', help_text)
+    return True
+
+
+def _render_help_table(host: Any, table: Any) -> None:
+    if host._renderer is None:
+        return
+    if hasattr(host._renderer, 'add_renderable'):
+        host._renderer.add_renderable(table, force_terminal=True)
+        return
+    from io import StringIO
+
+    from rich.console import Console
+
+    sio = StringIO()
+    table_console = Console(file=sio, force_terminal=True, width=100)
+    table_console.print(table)
+    host._renderer.add_system_message(sio.getvalue().strip(), title='help')
+
+
 def cmd_help(host: Any, parsed: Any) -> bool:
-    from backend.cli.repl.slash_registry_help import (
-        build_help_markdown,
-        build_help_table,
-    )
+    from backend.cli.repl.slash_registry_help import build_help_table
 
     if len(parsed.args) > 1:
         host._warn(f'Usage: {host._usage(parsed.name)}')
@@ -426,13 +448,7 @@ def cmd_help(host: Any, parsed: Any) -> bool:
             show_all = True
         elif arg not in ('--search', '-s'):
             # Specific command requested
-            help_text = build_help_markdown(arg)
-            if host._renderer is not None:
-                host._renderer.add_markdown_block(
-                    'Help',
-                    help_text,
-                )
-            return True
+            return _render_specific_help(host, arg)
 
     # Check for search flag
     if parsed.args and parsed.args[0] in ('--search', '-s'):
@@ -440,17 +456,5 @@ def cmd_help(host: Any, parsed: Any) -> bool:
 
     # Show interactive table (if renderer supports add_renderable)
     table = build_help_table(search_term, show_all=show_all)
-    if host._renderer is not None:
-        if hasattr(host._renderer, 'add_renderable'):
-            host._renderer.add_renderable(table, force_terminal=True)
-        else:
-            # Fallback: convert table to string and show as markdown
-            from io import StringIO
-
-            from rich.console import Console
-
-            sio = StringIO()
-            table_console = Console(file=sio, force_terminal=True, width=100)
-            table_console.print(table)
-            host._renderer.add_system_message(sio.getvalue().strip(), title='help')
+    _render_help_table(host, table)
     return True

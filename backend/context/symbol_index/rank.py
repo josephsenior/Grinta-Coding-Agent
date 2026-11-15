@@ -10,6 +10,55 @@ from backend.context.symbol_index.store import SymbolIndexStore
 from backend.engine.tools._aps_tree import _TREE_FILE_PRIORITY
 
 
+def _build_pagerank_edges(
+    nodes: list[str],
+    edges: list[tuple[str, str]],
+) -> tuple[dict[str, list[str]], dict[str, list[str]]]:
+    node_set = set(nodes)
+    out_edges: dict[str, list[str]] = defaultdict(list)
+    in_edges: dict[str, list[str]] = defaultdict(list)
+    for src, dst in edges:
+        if src in node_set and dst in node_set and src != dst:
+            out_edges[src].append(dst)
+            in_edges[dst].append(src)
+    return out_edges, in_edges
+
+
+def _normalize_teleport(
+    nodes: list[str],
+    personalization: dict[str, float] | None,
+) -> dict[str, float]:
+    node_set = set(nodes)
+    teleport = personalization or {}
+    teleport_sum = sum(teleport.values()) or 1.0
+    teleport_norm = {k: v / teleport_sum for k, v in teleport.items() if k in node_set}
+    if not teleport_norm:
+        teleport_norm = {node: 1.0 / len(nodes) for node in nodes}
+    return teleport_norm
+
+
+def _pagerank_iteration(
+    nodes: list[str],
+    ranks: dict[str, float],
+    out_edges: dict[str, list[str]],
+    in_edges: dict[str, list[str]],
+    teleport_norm: dict[str, float],
+    damping: float,
+) -> dict[str, float]:
+    next_ranks: dict[str, float] = {}
+    for node in nodes:
+        incoming = 0.0
+        for src in in_edges.get(node, []):
+            outs = out_edges.get(src) or []
+            if outs:
+                incoming += ranks[src] / len(outs)
+        next_ranks[node] = (1.0 - damping) * teleport_norm.get(
+            node, 0.0
+        ) + damping * incoming
+    total = sum(next_ranks.values()) or 1.0
+    return {node: score / total for node, score in next_ranks.items()}
+
+
 def _pagerank(
     nodes: list[str],
     edges: list[tuple[str, str]],
@@ -20,34 +69,18 @@ def _pagerank(
 ) -> dict[str, float]:
     if not nodes:
         return {}
-    node_set = set(nodes)
-    out_edges: dict[str, list[str]] = defaultdict(list)
-    in_edges: dict[str, list[str]] = defaultdict(list)
-    for src, dst in edges:
-        if src in node_set and dst in node_set and src != dst:
-            out_edges[src].append(dst)
-            in_edges[dst].append(src)
-
+    out_edges, in_edges = _build_pagerank_edges(nodes, edges)
     ranks = {node: 1.0 / len(nodes) for node in nodes}
-    teleport = personalization or {}
-    teleport_sum = sum(teleport.values()) or 1.0
-    teleport_norm = {k: v / teleport_sum for k, v in teleport.items() if k in node_set}
-    if not teleport_norm:
-        teleport_norm = {node: 1.0 / len(nodes) for node in nodes}
-
+    teleport_norm = _normalize_teleport(nodes, personalization)
     for _ in range(iterations):
-        next_ranks: dict[str, float] = {}
-        for node in nodes:
-            incoming = 0.0
-            for src in in_edges.get(node, []):
-                outs = out_edges.get(src) or []
-                if outs:
-                    incoming += ranks[src] / len(outs)
-            next_ranks[node] = (1.0 - damping) * teleport_norm.get(
-                node, 0.0
-            ) + damping * incoming
-        total = sum(next_ranks.values()) or 1.0
-        ranks = {node: score / total for node, score in next_ranks.items()}
+        ranks = _pagerank_iteration(
+            nodes,
+            ranks,
+            out_edges,
+            in_edges,
+            teleport_norm,
+            damping,
+        )
     return ranks
 
 

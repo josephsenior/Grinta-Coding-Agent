@@ -458,6 +458,24 @@ class SQLiteEventStore:
             )
         return data
 
+    def _decode_event_row(
+        self,
+        row: Any,
+        max_payload_bytes: int,
+    ) -> dict[str, Any]:
+        row_id = int(row['id'])
+        size = int(row['sz'] or 0)
+        if size > max_payload_bytes:
+            raise ValueError(f'Event payload too large ({size} bytes) for id={row_id}')
+        data = json.loads(row['payload'])
+        event_id = data.get('id')
+        if event_id is not None and event_id != row_id:
+            raise ValueError(f'Event {row_id}: payload id mismatch ({event_id!r})')
+        if not verify_event_integrity(data, row_id, log_mismatch=False):
+            data = repair_payload_checksum(data, event_id=row_id)
+            self._rewrite_payload(row_id, data)
+        return data
+
     def list_events(
         self,
         start_id: int = 0,
@@ -500,24 +518,8 @@ class SQLiteEventStore:
         conn = self._get_read_conn()
         rows = conn.execute(sql, params).fetchall()
 
-        results: list[dict[str, Any]] = []
         max_payload_bytes = self._max_payload_bytes()
-        for r in rows:
-            row_id = int(r['id'])
-            size = int(r['sz'] or 0)
-            if size > max_payload_bytes:
-                raise ValueError(
-                    f'Event payload too large ({size} bytes) for id={row_id}'
-                )
-            data = json.loads(r['payload'])
-            event_id = data.get('id')
-            if event_id is not None and event_id != row_id:
-                raise ValueError(f'Event {row_id}: payload id mismatch ({event_id!r})')
-            if not verify_event_integrity(data, row_id, log_mismatch=False):
-                data = repair_payload_checksum(data, event_id=row_id)
-                self._rewrite_payload(row_id, data)
-            results.append(data)
-        return results
+        return [self._decode_event_row(r, max_payload_bytes) for r in rows]
 
     def count(self) -> int:
         """Return the total number of persisted events."""

@@ -225,23 +225,27 @@ def matches_search_file_pattern(
     )
 
 
-def collect_python_target_files(
+def _collect_single_python_target(
+    path: str,
+    *,
+    spec_root: str,
+    spec: Any,
+) -> list[str]:
+    current_root = os.path.dirname(path) or '.'
+    if is_ignored_file(spec_root, current_root, os.path.basename(path), spec):
+        return []
+    return [path]
+
+
+def _collect_walked_python_targets(
     path: str,
     file_pattern: str,
     *,
-    walk_timeout_seconds: float = 30.0,
+    spec_root: str,
+    spec: Any,
+    deadline: float,
 ) -> list[str]:
-    spec_root = path if os.path.isdir(path) else os.path.dirname(path) or '.'
-    spec = get_ignore_spec(spec_root)
     target_files: list[str] = []
-    deadline = time.monotonic() + max(1.0, walk_timeout_seconds)
-
-    if os.path.isfile(path):
-        current_root = os.path.dirname(path) or '.'
-        if not is_ignored_file(spec_root, current_root, os.path.basename(path), spec):
-            target_files.append(path)
-        return target_files
-
     for root, dirs, files in os.walk(path):
         if time.monotonic() >= deadline:
             break
@@ -260,8 +264,29 @@ def collect_python_target_files(
             ):
                 continue
             target_files.append(file_path)
-
     return target_files
+
+
+def collect_python_target_files(
+    path: str,
+    file_pattern: str,
+    *,
+    walk_timeout_seconds: float = 30.0,
+) -> list[str]:
+    spec_root = path if os.path.isdir(path) else os.path.dirname(path) or '.'
+    spec = get_ignore_spec(spec_root)
+    deadline = time.monotonic() + max(1.0, walk_timeout_seconds)
+
+    if os.path.isfile(path):
+        return _collect_single_python_target(path, spec_root=spec_root, spec=spec)
+
+    return _collect_walked_python_targets(
+        path,
+        file_pattern,
+        spec_root=spec_root,
+        spec=spec,
+        deadline=deadline,
+    )
 
 
 def resolve_search_pagination(

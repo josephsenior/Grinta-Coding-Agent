@@ -985,29 +985,45 @@ def has_any_debug_adapter() -> bool:
     )
 
 
+def _available_lsp_names() -> list[str]:
+    return sorted(t.spec.name for t in detect_lsp_servers().values() if t.available)
+
+
+def _missing_lsp_names() -> list[str]:
+    return sorted(t.spec.name for t in detect_lsp_servers().values() if not t.available)
+
+
+def _available_debug_names(debug: list[dict]) -> list[str]:
+    return sorted(
+        f'{e["language"]}:{e["adapter"]}'
+        for e in debug
+        if e.get('auto_resolvable', e.get('available'))
+    )
+
+
+def _unsupported_debug_names(debug: list[dict]) -> list[str]:
+    return sorted(
+        f'{e["language"]}:{e["adapter"]}({e.get("transport", "unknown")})'
+        for e in debug
+        if e.get('available') and not e.get('auto_resolvable', e.get('available'))
+    )
+
+
+def _missing_debug_names(debug: list[dict]) -> list[str]:
+    return sorted(
+        f'{e["language"]}:{e["adapter"]}' for e in debug if not e.get('available')
+    )
+
+
 def detection_summary() -> dict[str, list[str]]:
     """Return a compact human/CLI-friendly summary of detection results."""
     debug = detect_debug_adapters_summary()
     return {
-        'lsp_available': sorted(
-            t.spec.name for t in detect_lsp_servers().values() if t.available
-        ),
-        'lsp_missing': sorted(
-            t.spec.name for t in detect_lsp_servers().values() if not t.available
-        ),
-        'debug_available': sorted(
-            f'{e["language"]}:{e["adapter"]}'
-            for e in debug
-            if e.get('auto_resolvable', e.get('available'))
-        ),
-        'debug_unsupported': sorted(
-            f'{e["language"]}:{e["adapter"]}({e.get("transport", "unknown")})'
-            for e in debug
-            if e.get('available') and not e.get('auto_resolvable', e.get('available'))
-        ),
-        'debug_missing': sorted(
-            f'{e["language"]}:{e["adapter"]}' for e in debug if not e.get('available')
-        ),
+        'lsp_available': _available_lsp_names(),
+        'lsp_missing': _missing_lsp_names(),
+        'debug_available': _available_debug_names(debug),
+        'debug_unsupported': _unsupported_debug_names(debug),
+        'debug_missing': _missing_debug_names(debug),
     }
 
 

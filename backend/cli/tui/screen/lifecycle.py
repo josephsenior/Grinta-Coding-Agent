@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
+from typing import Any
 
 from textual.app import ComposeResult
 from textual.containers import (
@@ -172,12 +173,23 @@ class ScreenLifecycleMixin(ScreenLifecycleBootstrapMixin, ScreenLifecycleDispatc
     def on_unmount(self) -> None:
         _tui_logger.debug('on_unmount: GrintaScreen unmounting')
         self._is_unmounted = True
+        self._unmount_stop_ticks()
+        self._unmount_cancel_tasks()
+        self._unmount_stop_settings_watcher()
+        self._unmount_detach_renderer_stream()
+        self._unmount_close_event_stream()
+        self._unmount_finalize_logging_audit()
+        _tui_logger.debug('on_unmount: done')
+
+    def _unmount_stop_ticks(self) -> None:
         if self._hud_tick is not None:
             self._hud_tick.stop()
             self._hud_tick = None
         if getattr(self, '_hud_pulse_tick', None) is not None:
             self._hud_pulse_tick.stop()
             self._hud_pulse_tick = None
+
+    def _unmount_cancel_tasks(self) -> None:
         if self._bootstrap_task and not self._bootstrap_task.done():
             self._bootstrap_task.cancel()
         if self._environment_probe_task and not self._environment_probe_task.done():
@@ -187,6 +199,7 @@ class ScreenLifecycleMixin(ScreenLifecycleBootstrapMixin, ScreenLifecycleDispatc
             self._responsiveness_task.cancel()
             self._responsiveness_task = None
 
+    def _unmount_stop_settings_watcher(self) -> None:
         # Tear down the MCP live-reload plumbing (file watcher + bus
         # adapter). Done best-effort; a failure here must not stop the
         # rest of unmount.
@@ -201,34 +214,38 @@ class ScreenLifecycleMixin(ScreenLifecycleBootstrapMixin, ScreenLifecycleDispatc
                     'on_unmount: settings watcher stop dispatch failed', exc_info=True
                 )
 
-        if self._renderer:
-            renderer_stream = getattr(self._renderer, '_event_stream', None)
-            if renderer_stream is not None:
-                renderer_stream.unsubscribe(
-                    EventStreamSubscriber.CLI, renderer_stream.sid
-                )
-            if hasattr(self._renderer, '_event_stream'):
-                self._renderer._event_stream = None
-        if self._event_stream is not None:
-            try:
-                self._event_stream.unsubscribe(
-                    EventStreamSubscriber.CLI, self._event_stream.sid
-                )
-                close_fn = getattr(self._event_stream, 'close', None)
-                if callable(close_fn):
-                    close_fn()
-                    _tui_logger.debug('on_unmount: event_stream closed')
-            except Exception as exc:
-                _tui_logger.debug(f'on_unmount: event_stream close failed: {exc}')
-            finally:
-                self._event_stream = None
+    def _unmount_detach_renderer_stream(self) -> None:
+        if not self._renderer:
+            return
+        renderer_stream = getattr(self._renderer, '_event_stream', None)
+        if renderer_stream is not None:
+            renderer_stream.unsubscribe(EventStreamSubscriber.CLI, renderer_stream.sid)
+        if hasattr(self._renderer, '_event_stream'):
+            self._renderer._event_stream = None
+
+    def _unmount_close_event_stream(self) -> None:
+        if self._event_stream is None:
+            return
+        try:
+            self._event_stream.unsubscribe(
+                EventStreamSubscriber.CLI, self._event_stream.sid
+            )
+            close_fn = getattr(self._event_stream, 'close', None)
+            if callable(close_fn):
+                close_fn()
+                _tui_logger.debug('on_unmount: event_stream closed')
+        except Exception as exc:
+            _tui_logger.debug(f'on_unmount: event_stream close failed: {exc}')
+        finally:
+            self._event_stream = None
+
+    def _unmount_finalize_logging_audit(self) -> None:
         try:
             from backend.core.logging.logger import finalize_session_logging_audit
 
             finalize_session_logging_audit()
         except Exception as exc:
             _tui_logger.debug('on_unmount: session audit generation failed: %s', exc)
-        _tui_logger.debug('on_unmount: done')
 
     def show_help(self) -> None:
         def _on_help_dismiss(command: str | None) -> None:
@@ -236,6 +253,149 @@ class ScreenLifecycleMixin(ScreenLifecycleBootstrapMixin, ScreenLifecycleDispatc
                 self.apply_slash_command_from_palette(command)
 
         self.app.push_screen(GrintaHelpDialog(), _on_help_dismiss)
+
+    def _bootstrap_create_event_stream(
+        self, config: Any, session_id: str | None
+    ) -> EventStream:
+        file_store = get_file_store(
+            file_store_type=config.file_store,
+            local_data_root=get_local_data_root(config),
+        )
+        sid = session_id.strip() if session_id else generate_sid(config)
+        self._bootstrap_bind_logging(sid)
+        self._bootstrap_bind_session_context(sid)
+        return EventStream(sid=sid, file_store=file_store, user_id='tui')
+
+    def _bootstrap_bind_logging(self, sid: str) -> None:
+        try:
+            from backend.core.logging.logger import (
+                bind_session_logging,
+                configure_file_logging,
+            )
+
+            configure_file_logging()
+            bind_session_logging(sid)
+        except Exception:
+            logger.exception('TUI bootstrap: failed to bind session logging')
+
+    def _bootstrap_bind_session_context(self, sid: str) -> None:
+        try:
+            from backend.context.memory.session_context import bind_session_context
+
+            bind_session_context(session_id=sid)
+        except Exception:
+            logger.debug('Failed to bind session context at bootstrap', exc_info=True)
+
+    async def _bootstrap_run_phase1(
+        self, config: Any, event_stream: EventStream
+    ) -> tuple[Any, Any, Any]:
+        try:
+            return await asyncio.to_thread(
+                self._bootstrap_sync_phase1, config, event_stream
+            )
+        except Exception as exc:
+            _tui_logger.debug(
+                f'_bootstrap: EXCEPTION phase1 {type(exc).__name__}: {exc}'
+            )
+            logger.exception('TUI _bootstrap: failed in phase1')
+            raise
+
+    async def _bootstrap_run_phase2(
+        self,
+        agent: Any,
+        runtime: Any,
+        event_stream: EventStream,
+        config: Any,
+        conversation_stats: Any,
+    ) -> tuple[Any, Any]:
+        try:
+            return await asyncio.to_thread(
+                self._bootstrap_sync_phase2,
+                agent,
+                runtime,
+                event_stream,
+                config,
+                conversation_stats,
+            )
+        except Exception as exc:
+            _tui_logger.debug(
+                f'_bootstrap: EXCEPTION phase2 {type(exc).__name__}: {exc}'
+            )
+            logger.exception('TUI _bootstrap: failed in phase2')
+            raise
+
+    def _bootstrap_activate_controller(
+        self,
+        agent: Any,
+        runtime: Any,
+        memory: Any,
+        controller: Any,
+        config: Any,
+    ) -> None:
+        self._runtime_stub = runtime
+        self._memory_stub = memory
+        self._controller = controller
+
+        asyncio.create_task(
+            asyncio.to_thread(
+                controller._create_phase_boundary_checkpoint,
+                'init_to_active',
+            ),
+            name='grinta-init-checkpoint',
+        )
+
+        from backend.cli.settings.bootstrap_sync import (
+            sync_controller_persisted_settings,
+        )
+
+        sync_controller_persisted_settings(
+            controller,
+            self._active_agent_name(),
+            config=config,
+            hud=self._hud,
+        )
+
+    async def _bootstrap_finalize_runtime(
+        self,
+        agent: Any,
+        runtime: Any,
+        memory: Any,
+        event_stream: EventStream,
+        controller: Any,
+    ) -> None:
+        from backend.utils.async_helpers.async_utils import set_main_event_loop
+
+        set_main_event_loop(self._loop)
+        _tui_logger.debug(f'_bootstrap: set_main_event_loop to {self._loop}')
+        retry_service = getattr(controller, 'retry_service', None)
+        ensure_worker = getattr(retry_service, 'ensure_worker_started', None)
+        if callable(ensure_worker):
+            ensure_worker()
+
+        await self._bootstrap_setup_renderer(event_stream, controller)
+        self._show_wsl_startup_warnings()
+        self._start_environment_probe(agent, runtime, memory)
+
+    def _bootstrap_cleanup_event_stream(self, event_stream: EventStream | None) -> None:
+        if event_stream is not None:
+            close_fn = getattr(event_stream, 'close', None)
+            if callable(close_fn):
+                try:
+                    close_fn()
+                except Exception:
+                    pass
+        if self._event_stream is event_stream:
+            self._event_stream = None
+
+    def _bootstrap_mark_ready(self, bootstrapping: asyncio.Event) -> None:
+        bootstrapping.set()
+        ready = self._environment_ready
+        if (
+            ready is not None
+            and not ready.is_set()
+            and self._environment_probe_task is None
+        ):
+            ready.set()
 
     async def _bootstrap(self, session_id: str | None = None) -> None:
         _tui_logger.debug('_bootstrap: start')
@@ -249,41 +409,11 @@ class ScreenLifecycleMixin(ScreenLifecycleBootstrapMixin, ScreenLifecycleDispatc
 
         event_stream = None
         try:
-            file_store = get_file_store(
-                file_store_type=config.file_store,
-                local_data_root=get_local_data_root(config),
-            )
-            sid = session_id.strip() if session_id else generate_sid(config)
-            try:
-                from backend.core.logging.logger import (
-                    bind_session_logging,
-                    configure_file_logging,
-                )
-
-                configure_file_logging()
-                bind_session_logging(sid)
-            except Exception:
-                logger.exception('TUI bootstrap: failed to bind session logging')
-            try:
-                from backend.context.memory.session_context import bind_session_context
-
-                bind_session_context(session_id=sid)
-            except Exception:
-                logger.debug(
-                    'Failed to bind session context at bootstrap', exc_info=True
-                )
-            event_stream = EventStream(sid=sid, file_store=file_store, user_id='tui')
+            event_stream = self._bootstrap_create_event_stream(config, session_id)
             self._event_stream = event_stream
-            try:
-                agent, runtime, conversation_stats = await asyncio.to_thread(
-                    self._bootstrap_sync_phase1, config, event_stream
-                )
-            except Exception as exc:
-                _tui_logger.debug(
-                    f'_bootstrap: EXCEPTION phase1 {type(exc).__name__}: {exc}'
-                )
-                logger.exception('TUI _bootstrap: failed in phase1')
-                raise
+            agent, runtime, conversation_stats = await self._bootstrap_run_phase1(
+                config, event_stream
+            )
             if self._bootstrap_check_unmounted(event_stream):
                 return
 
@@ -293,21 +423,13 @@ class ScreenLifecycleMixin(ScreenLifecycleBootstrapMixin, ScreenLifecycleDispatc
 
             await self._bootstrap_connect_runtime(runtime)
 
-            try:
-                memory, controller = await asyncio.to_thread(
-                    self._bootstrap_sync_phase2,
-                    agent,
-                    runtime,
-                    event_stream,
-                    config,
-                    conversation_stats,
-                )
-            except Exception as exc:
-                _tui_logger.debug(
-                    f'_bootstrap: EXCEPTION phase2 {type(exc).__name__}: {exc}'
-                )
-                logger.exception('TUI _bootstrap: failed in phase2')
-                raise
+            memory, controller = await self._bootstrap_run_phase2(
+                agent,
+                runtime,
+                event_stream,
+                config,
+                conversation_stats,
+            )
 
             _tui_logger.debug(
                 f'_bootstrap: controller created, state={controller.get_agent_state()}'
@@ -319,64 +441,20 @@ class ScreenLifecycleMixin(ScreenLifecycleBootstrapMixin, ScreenLifecycleDispatc
             )
             if self._bootstrap_check_unmounted(event_stream):
                 return
-            self._runtime_stub = runtime
-            self._memory_stub = memory
-            self._controller = controller
-
-            asyncio.create_task(
-                asyncio.to_thread(
-                    controller._create_phase_boundary_checkpoint,
-                    'init_to_active',
-                ),
-                name='grinta-init-checkpoint',
-            )
-
-            from backend.cli.settings.bootstrap_sync import (
-                sync_controller_persisted_settings,
-            )
-
-            sync_controller_persisted_settings(
-                controller,
-                self._active_agent_name(),
-                config=config,
-                hud=self._hud,
+            self._bootstrap_activate_controller(
+                agent, runtime, memory, controller, config
             )
             await self._maybe_harden_unfamiliar_workspace(controller, config)
             self._render_hud_bar()
-
-            from backend.utils.async_helpers.async_utils import set_main_event_loop
-
-            set_main_event_loop(self._loop)
-            _tui_logger.debug(f'_bootstrap: set_main_event_loop to {self._loop}')
-            retry_service = getattr(controller, 'retry_service', None)
-            ensure_worker = getattr(retry_service, 'ensure_worker_started', None)
-            if callable(ensure_worker):
-                ensure_worker()
-
-            await self._bootstrap_setup_renderer(event_stream, controller)
-            self._show_wsl_startup_warnings()
-            self._start_environment_probe(agent, runtime, memory)
+            await self._bootstrap_finalize_runtime(
+                agent, runtime, memory, event_stream, controller
+            )
             _tui_logger.debug('_bootstrap: done')
         except BaseException:
-            if event_stream is not None:
-                close_fn = getattr(event_stream, 'close', None)
-                if callable(close_fn):
-                    try:
-                        close_fn()
-                    except Exception:
-                        pass
-            if self._event_stream is event_stream:
-                self._event_stream = None
+            self._bootstrap_cleanup_event_stream(event_stream)
             raise
         finally:
-            _bootstrapping.set()
-            ready = self._environment_ready
-            if (
-                ready is not None
-                and not ready.is_set()
-                and self._environment_probe_task is None
-            ):
-                ready.set()
+            self._bootstrap_mark_ready(_bootstrapping)
 
     async def _maybe_harden_unfamiliar_workspace(
         self, controller: object, config: object

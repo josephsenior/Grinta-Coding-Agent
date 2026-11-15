@@ -314,6 +314,24 @@ def _apply_json_llm_model_temperatures(
     llm_dict['model_temperature_overrides'] = overrides
 
 
+def _apply_json_llm_int_field(
+    llm_dict: dict[str, object],
+    data: dict[str, object],
+    *,
+    source_key: str,
+    target_key: str,
+) -> None:
+    if source_key not in data:
+        return
+    raw = data[source_key]
+    if raw is None:
+        return
+    try:
+        llm_dict[target_key] = int(str(raw))
+    except (ValueError, TypeError):
+        pass
+
+
 def _build_json_llm_config(
     cfg: AppConfig, data: dict[str, object]
 ) -> dict[str, object]:
@@ -324,20 +342,18 @@ def _build_json_llm_config(
     _warn_on_literal_llm_api_key(data.get('llm_api_key'))
     _sync_llm_api_key_from_env(llm_dict)
     _apply_json_llm_base_url(llm_dict, data)
-    if 'llm_max_output_tokens' in data:
-        raw = data['llm_max_output_tokens']
-        if raw is not None:
-            try:
-                llm_dict['max_output_tokens'] = int(str(raw))
-            except (ValueError, TypeError):
-                pass
-    if 'llm_context_window_tokens' in data:
-        raw = data['llm_context_window_tokens']
-        if raw is not None:
-            try:
-                llm_dict['context_window_tokens'] = int(str(raw))
-            except (ValueError, TypeError):
-                pass
+    _apply_json_llm_int_field(
+        llm_dict,
+        data,
+        source_key='llm_max_output_tokens',
+        target_key='max_output_tokens',
+    )
+    _apply_json_llm_int_field(
+        llm_dict,
+        data,
+        source_key='llm_context_window_tokens',
+        target_key='context_window_tokens',
+    )
     reasoning_raw = data.get('llm_reasoning_effort')
     if reasoning_raw is not None and str(reasoning_raw).strip():
         llm_dict['reasoning_effort'] = str(reasoning_raw).strip()
@@ -373,39 +389,51 @@ def _apply_json_llm_config(
     cfg.set_llm_config(LLMConfig.model_validate(llm_dict))
 
 
+def _apply_json_string_top_level_fields(
+    cfg: AppConfig, data: dict[str, object]
+) -> None:
+    for field in ('mcp_host', 'project_root', 'save_trajectory_path', 'log_level'):
+        if data.get(field):
+            setattr(cfg, field, cast(str, data[field]))
+
+
+def _apply_json_max_budget(cfg: AppConfig, raw: object) -> None:
+    if raw is None:
+        cfg.max_budget_per_task = None
+        return
+    try:
+        value = float(str(raw))
+    except (ValueError, TypeError):
+        return
+    cfg.max_budget_per_task = value if value > 0 else None
+
+
+def _apply_json_max_iterations(cfg: AppConfig, raw: object) -> None:
+    if raw is None:
+        return
+    try:
+        cfg.max_iterations = max(1, int(str(raw)))
+    except (ValueError, TypeError):
+        pass
+
+
+def _apply_json_pending_action_timeout(cfg: AppConfig, raw: object) -> None:
+    if raw is None:
+        return
+    try:
+        cfg.pending_action_timeout = float(str(raw))
+    except (ValueError, TypeError):
+        pass
+
+
 def _apply_json_top_level_fields(cfg: AppConfig, data: dict[str, object]) -> None:
-    if data.get('mcp_host'):
-        cfg.mcp_host = cast(str, data['mcp_host'])
-    if data.get('project_root'):
-        cfg.project_root = cast(str, data['project_root'])
+    _apply_json_string_top_level_fields(cfg, data)
     if 'max_budget_per_task' in data:
-        raw = data['max_budget_per_task']
-        if raw is None:
-            cfg.max_budget_per_task = None
-        else:
-            try:
-                value = float(str(raw))
-                cfg.max_budget_per_task = value if value > 0 else None
-            except (ValueError, TypeError):
-                pass
+        _apply_json_max_budget(cfg, data['max_budget_per_task'])
     if 'max_iterations' in data:
-        raw = data['max_iterations']
-        if raw is not None:
-            try:
-                cfg.max_iterations = max(1, int(str(raw)))
-            except (ValueError, TypeError):
-                pass
+        _apply_json_max_iterations(cfg, data['max_iterations'])
     if 'pending_action_timeout' in data:
-        raw = data['pending_action_timeout']
-        if raw is not None:
-            try:
-                cfg.pending_action_timeout = float(str(raw))
-            except (ValueError, TypeError):
-                pass
-    if data.get('save_trajectory_path'):
-        cfg.save_trajectory_path = cast(str, data['save_trajectory_path'])
-    if data.get('log_level'):
-        cfg.log_level = cast(str, data['log_level'])
+        _apply_json_pending_action_timeout(cfg, data['pending_action_timeout'])
     if 'cli_tool_icons' in data:
         cfg.cli_tool_icons = bool(data['cli_tool_icons'])
 

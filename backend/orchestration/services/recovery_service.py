@@ -231,6 +231,15 @@ class RecoveryService:
         )
 
     @staticmethod
+    def _rate_limit_category(exc: Exception) -> str:
+        if isinstance(exc, RateLimitError) and exc.kind in (
+            RateLimitKind.RPD,
+            RateLimitKind.USAGE_QUOTA,
+        ):
+            return ERROR_CATEGORY_DAILY_QUOTA
+        return ERROR_CATEGORY_RATE_LIMIT
+
+    @staticmethod
     def _error_category_for(exc: Exception) -> str | None:
         """Return a structured error category constant from the actual exception type.
 
@@ -238,46 +247,28 @@ class RecoveryService:
         The UI reads ``ErrorObservation.error_category`` directly so it never
         needs to parse rendered error text.
         """
-        from backend.core.errors import (
-            AgentRuntimeDisconnectedError,
-            LLMContextWindowExceedError,
-        )
-        from backend.inference.exceptions import (
-            APIConnectionError,
-            AuthenticationError,
-            BadRequestError,
-            ContentPolicyViolationError,
-            ContextWindowExceededError,
-            InternalServerError,
-            NotFoundError,
-            RateLimitError,
-            ServiceUnavailableError,
-            Timeout,
-        )
-
         if isinstance(exc, (RateLimitError, ServiceUnavailableError)):
-            if isinstance(exc, RateLimitError) and exc.kind in (
-                RateLimitKind.RPD,
-                RateLimitKind.USAGE_QUOTA,
-            ):
-                return ERROR_CATEGORY_DAILY_QUOTA
-            return ERROR_CATEGORY_RATE_LIMIT
-        if isinstance(exc, AuthenticationError):
-            return ERROR_CATEGORY_AUTH
-        if isinstance(exc, BadRequestError):
-            return ERROR_CATEGORY_BAD_REQUEST
-        if isinstance(exc, (ContextWindowExceededError, LLMContextWindowExceedError)):
-            return ERROR_CATEGORY_CONTEXT_WINDOW
-        if isinstance(exc, Timeout):
-            return ERROR_CATEGORY_TIMEOUT
-        if isinstance(exc, (APIConnectionError, InternalServerError)):
-            return ERROR_CATEGORY_NETWORK
-        if isinstance(exc, NotFoundError):
-            return ERROR_CATEGORY_MODEL_NOT_FOUND
-        if isinstance(exc, AgentRuntimeDisconnectedError):
-            return ERROR_CATEGORY_RUNTIME_DISCONNECTED
-        if isinstance(exc, ContentPolicyViolationError):
-            return ERROR_CATEGORY_CONTENT_POLICY
+            return RecoveryService._rate_limit_category(exc)
+
+        rules: tuple[tuple[tuple[type[BaseException], ...], str], ...] = (
+            ((AuthenticationError,), ERROR_CATEGORY_AUTH),
+            ((BadRequestError,), ERROR_CATEGORY_BAD_REQUEST),
+            (
+                (ContextWindowExceededError, LLMContextWindowExceedError),
+                ERROR_CATEGORY_CONTEXT_WINDOW,
+            ),
+            ((Timeout,), ERROR_CATEGORY_TIMEOUT),
+            (
+                (APIConnectionError, InternalServerError),
+                ERROR_CATEGORY_NETWORK,
+            ),
+            ((NotFoundError,), ERROR_CATEGORY_MODEL_NOT_FOUND),
+            ((AgentRuntimeDisconnectedError,), ERROR_CATEGORY_RUNTIME_DISCONNECTED),
+            ((ContentPolicyViolationError,), ERROR_CATEGORY_CONTENT_POLICY),
+        )
+        for exc_types, category in rules:
+            if isinstance(exc, exc_types):
+                return category
         return None
 
     async def _set_awaiting_user_input_if_allowed(self, controller) -> None:

@@ -130,6 +130,41 @@ class RendererTerminalMixin:
         self._append_scan_line_card(card)
         return card
 
+    def _pop_pending_shell_card(
+        self, command_key: str, action_id: int | None
+    ) -> Any | None:
+        card = self._take_tool_card(action_id, expected_kind='shell')
+        if card is not None or (action_id is not None and action_id >= 0):
+            return card
+        queue = self._pending_shell_cards_by_command.get(command_key)
+        card = queue.popleft() if queue else None
+        if queue is not None and not queue:
+            self._pending_shell_cards_by_command.pop(command_key, None)
+        return card
+
+    def _apply_shell_card_completion(
+        self,
+        card: Any,
+        *,
+        output: str,
+        exit_code: int | None,
+        cwd: str | None,
+        is_background: bool,
+    ) -> None:
+        card.output = output
+        card.exit_code = exit_code
+        card.cwd = cwd or card.cwd
+        card.is_background = is_background
+        if is_background:
+            card.set_state('background')
+        elif exit_code == 0:
+            card.set_state('done')
+        elif exit_code is not None:
+            card.set_state('failed')
+        else:
+            card.set_state('done')
+        card._refresh_line()
+
     def _complete_shell_scan_card(
         self,
         command_key: str,
@@ -142,12 +177,7 @@ class RendererTerminalMixin:
         action_id: int | None = None,
     ) -> None:
         display_command = command if command is not None else command_key
-        card = self._take_tool_card(action_id, expected_kind='shell')
-        if card is None and (action_id is None or action_id < 0):
-            queue = self._pending_shell_cards_by_command.get(command_key)
-            card = queue.popleft() if queue else None
-            if queue is not None and not queue:
-                self._pending_shell_cards_by_command.pop(command_key, None)
+        card = self._pop_pending_shell_card(command_key, action_id)
 
         if card is None:
             from backend.cli.tui.widgets.scan_line import ShellCard
@@ -162,19 +192,13 @@ class RendererTerminalMixin:
             self._append_scan_line_card(card)
             return
 
-        card.output = output
-        card.exit_code = exit_code
-        card.cwd = cwd or card.cwd
-        card.is_background = is_background
-        if is_background:
-            card.set_state('background')
-        elif exit_code == 0:
-            card.set_state('done')
-        elif exit_code is not None:
-            card.set_state('failed')
-        else:
-            card.set_state('done')
-        card._refresh_line()
+        self._apply_shell_card_completion(
+            card,
+            output=output,
+            exit_code=exit_code,
+            cwd=cwd,
+            is_background=is_background,
+        )
 
     # ── scan-line terminal card ───────────────────────────────────────
 
@@ -280,20 +304,19 @@ class RendererTerminalMixin:
         self._register_tool_card(action_id, card, kind='terminal_close')
         return card
 
-    def _fail_tool_scan_card(self, action_id: int | None, content: str) -> bool:
-        """Fail a correlated card in place; return whether one was resolved."""
-        kind = self._tool_card_kind(action_id)
-        card = self._take_tool_card(action_id, expected_kind=kind)
-        if card is None:
-            return False
-        if hasattr(card, 'output'):
-            card.output = content
+    @staticmethod
+    def _merge_failed_card_scrollback(card: Any, content: str) -> None:
         if hasattr(card, 'scrollback'):
             existing = str(getattr(card, 'scrollback', '') or '')
             card.scrollback = '\n'.join(part for part in (existing, content) if part)
+
+    @staticmethod
+    def _apply_failed_card_fields(card: Any, content: str) -> None:
         for attr in ('result', 'error', 'status_message'):
             if hasattr(card, attr):
                 setattr(card, attr, content)
+
+    def _clear_failed_card_pending_refs(self, card: Any) -> None:
         for pending_attr in (
             '_pending_mcp_card',
             '_pending_delegate_card',
@@ -302,6 +325,18 @@ class RendererTerminalMixin:
         ):
             if getattr(self, pending_attr, None) is card:
                 setattr(self, pending_attr, None)
+
+    def _fail_tool_scan_card(self, action_id: int | None, content: str) -> bool:
+        """Fail a correlated card in place; return whether one was resolved."""
+        kind = self._tool_card_kind(action_id)
+        card = self._take_tool_card(action_id, expected_kind=kind)
+        if card is None:
+            return False
+        if hasattr(card, 'output'):
+            card.output = content
+        self._merge_failed_card_scrollback(card, content)
+        self._apply_failed_card_fields(card, content)
+        self._clear_failed_card_pending_refs(card)
         card.set_state('failed')
         card._refresh_line()
         return True

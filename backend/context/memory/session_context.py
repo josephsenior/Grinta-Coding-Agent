@@ -27,6 +27,30 @@ def _clear_symbol_index_on_new_session(session_id: str) -> None:
         logger.debug('Symbol index session reset skipped', exc_info=True)
 
 
+def _clean_session_candidate(value: object) -> str | None:
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    return None
+
+
+def _session_id_from_contextvar() -> str | None:
+    try:
+        from backend.engine.tools.working_memory import get_current_session_id
+
+        return _clean_session_candidate(get_current_session_id())
+    except Exception:
+        return None
+
+
+def _session_id_from_logger() -> str | None:
+    try:
+        from backend.core.logging.session_event_logger import get_bound_session_id
+
+        return _clean_session_candidate(get_bound_session_id())
+    except Exception:
+        return None
+
+
 def resolve_session_id(
     *,
     state: State | None = None,
@@ -41,25 +65,10 @@ def resolve_session_id(
         session_id,
         getattr(state, 'session_id', None) if state is not None else None,
     ):
-        if isinstance(candidate, str) and candidate.strip():
-            return candidate.strip()
-    try:
-        from backend.engine.tools.working_memory import get_current_session_id
-
-        ctx = get_current_session_id()
-        if isinstance(ctx, str) and ctx.strip():
-            return ctx.strip()
-    except Exception:
-        pass
-    try:
-        from backend.core.logging.session_event_logger import get_bound_session_id
-
-        sid = get_bound_session_id()
-        if isinstance(sid, str) and sid.strip():
-            return sid.strip()
-    except Exception:
-        pass
-    return None
+        resolved = _clean_session_candidate(candidate)
+        if resolved:
+            return resolved
+    return _session_id_from_contextvar() or _session_id_from_logger()
 
 
 def bind_session_context(

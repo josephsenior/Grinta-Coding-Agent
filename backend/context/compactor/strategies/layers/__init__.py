@@ -141,15 +141,7 @@ async def recent_keep_layer(
     return events
 
 
-async def post_compact_reattach_layer(
-    events: list[Event],
-    state: State | None = None,
-) -> list[Event]:
-    """Re-attach file read events for files that were modified in the session.
-
-    Scans events for file edits, then injects FileReadObservation events
-    for the N most-recently modified files. Respects POST_COMPACT_BUDGET.
-    """
+def _recent_changed_files(events: list[Event]) -> list[str]:
     seen_paths: set[str] = set()
     changed_files: list[str] = []
     for event in reversed(events):
@@ -159,10 +151,10 @@ async def post_compact_reattach_layer(
             changed_files.append(fpath)
         if len(changed_files) >= POST_COMPACT_MAX_FILES:
             break
+    return changed_files
 
-    if not changed_files:
-        return events
 
+def _reattach_observations(changed_files: list[str]) -> list[Event]:
     inserted: list[Event] = []
     budget_remaining = POST_COMPACT_BUDGET
     for fpath in changed_files:
@@ -180,7 +172,23 @@ async def post_compact_reattach_layer(
             inserted.append(obs)
         except Exception:
             pass
+    return inserted
 
+
+async def post_compact_reattach_layer(
+    events: list[Event],
+    state: State | None = None,
+) -> list[Event]:
+    """Re-attach file read events for files that were modified in the session.
+
+    Scans events for file edits, then injects FileReadObservation events
+    for the N most-recently modified files. Respects POST_COMPACT_BUDGET.
+    """
+    changed_files = _recent_changed_files(events)
+    if not changed_files:
+        return events
+
+    inserted = _reattach_observations(changed_files)
     if inserted:
         return inserted + events
     return events

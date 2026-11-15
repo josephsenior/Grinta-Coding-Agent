@@ -331,57 +331,88 @@ def _parse_diff(
 
     for raw in lines:
         if raw.startswith('diff --git'):
-            path = _extract_path_from_diff_header(raw)
             file_idx += 1
             hunk_idx = -1
             current_hunk_lines = []
-            fi = _FileInfo(file_idx, path)
-            files.append(fi)
-            dl = _DiffLine(raw, _PRIORITY_DIFF_METADATA, 'metadata', file_idx, -1)
-            fi.metadata_lines.append(dl)
-            all_lines.append(dl)
-        elif (
-            raw.startswith('index ') or raw.startswith('--- ') or raw.startswith('+++ ')
-        ):
-            if file_idx >= 0:
-                dl = _DiffLine(raw, _PRIORITY_DIFF_METADATA, 'metadata', file_idx, -1)
-                files[file_idx].metadata_lines.append(dl)
-                all_lines.append(dl)
-            else:
-                all_lines.append(_DiffLine(raw, _PRIORITY_CONTEXT, 'context', 0, -1))
+            all_lines.append(_new_file_diff_line(raw, files, file_idx))
+        elif _is_diff_metadata_line(raw):
+            _append_metadata_line(raw, files, file_idx, all_lines)
         elif raw.startswith('@@'):
             hunk_idx += 1
-            hdl = _DiffLine(
-                raw, _PRIORITY_HUNK_HEADER, 'hunk_header', file_idx, hunk_idx
-            )
-            hi = _HunkInfo(hunk_idx, file_idx, hdl)
-            if file_idx >= 0:
-                files[file_idx].hunks.append(hi)
-            hunks.append(hi)
-            all_lines.append(hdl)
             current_hunk_lines = []
-        elif raw.startswith('+'):
-            dl = _DiffLine(raw, _PRIORITY_CHANGE, 'add', file_idx, hunk_idx)
-            all_lines.append(dl)
-            current_hunk_lines.append(dl)
-            if hunk_idx >= 0:
-                hunks[hunk_idx].additions += 1
-        elif raw.startswith('-'):
-            dl = _DiffLine(raw, _PRIORITY_CHANGE, 'remove', file_idx, hunk_idx)
-            all_lines.append(dl)
-            current_hunk_lines.append(dl)
-            if hunk_idx >= 0:
-                hunks[hunk_idx].deletions += 1
+            _append_hunk_header(raw, files, hunks, all_lines, file_idx, hunk_idx)
         else:
-            dl = _DiffLine(raw, _PRIORITY_CONTEXT, 'context', file_idx, hunk_idx)
-            all_lines.append(dl)
-            current_hunk_lines.append(dl)
-            if hunk_idx >= 0:
-                hunks[hunk_idx].context_count += 1
+            current_hunk_lines.append(
+                _append_content_line(raw, all_lines, hunks, file_idx, hunk_idx)
+            )
 
     _mark_adjacent_context(current_hunk_lines)
     _mark_adjacent_context_for_all_hunks(all_lines, hunks)
     return all_lines, files, hunks
+
+
+def _is_diff_metadata_line(raw: str) -> bool:
+    return raw.startswith('index ') or raw.startswith('--- ') or raw.startswith('+++ ')
+
+
+def _new_file_diff_line(raw: str, files: list[_FileInfo], file_idx: int) -> _DiffLine:
+    fi = _FileInfo(file_idx, _extract_path_from_diff_header(raw))
+    files.append(fi)
+    dl = _DiffLine(raw, _PRIORITY_DIFF_METADATA, 'metadata', file_idx, -1)
+    fi.metadata_lines.append(dl)
+    return dl
+
+
+def _append_metadata_line(
+    raw: str, files: list[_FileInfo], file_idx: int, all_lines: list[_DiffLine]
+) -> None:
+    if file_idx >= 0:
+        dl = _DiffLine(raw, _PRIORITY_DIFF_METADATA, 'metadata', file_idx, -1)
+        files[file_idx].metadata_lines.append(dl)
+    else:
+        dl = _DiffLine(raw, _PRIORITY_CONTEXT, 'context', 0, -1)
+    all_lines.append(dl)
+
+
+def _append_hunk_header(
+    raw: str,
+    files: list[_FileInfo],
+    hunks: list[_HunkInfo],
+    all_lines: list[_DiffLine],
+    file_idx: int,
+    hunk_idx: int,
+) -> None:
+    hdl = _DiffLine(raw, _PRIORITY_HUNK_HEADER, 'hunk_header', file_idx, hunk_idx)
+    hi = _HunkInfo(hunk_idx, file_idx, hdl)
+    if file_idx >= 0:
+        files[file_idx].hunks.append(hi)
+    hunks.append(hi)
+    all_lines.append(hdl)
+
+
+def _append_content_line(
+    raw: str,
+    all_lines: list[_DiffLine],
+    hunks: list[_HunkInfo],
+    file_idx: int,
+    hunk_idx: int,
+) -> _DiffLine:
+    if raw.startswith('+'):
+        dl = _DiffLine(raw, _PRIORITY_CHANGE, 'add', file_idx, hunk_idx)
+        all_lines.append(dl)
+        if hunk_idx >= 0:
+            hunks[hunk_idx].additions += 1
+    elif raw.startswith('-'):
+        dl = _DiffLine(raw, _PRIORITY_CHANGE, 'remove', file_idx, hunk_idx)
+        all_lines.append(dl)
+        if hunk_idx >= 0:
+            hunks[hunk_idx].deletions += 1
+    else:
+        dl = _DiffLine(raw, _PRIORITY_CONTEXT, 'context', file_idx, hunk_idx)
+        all_lines.append(dl)
+        if hunk_idx >= 0:
+            hunks[hunk_idx].context_count += 1
+    return dl
 
 
 def _mark_adjacent_context_for_all_hunks(
@@ -628,12 +659,7 @@ def _file_telemetry(
     omitted_add = total_add - kept_add
     omitted_del = total_del - kept_del
     omitted_hunks = sum(1 for h in f_hunks if not _hunk_has_kept_changes(h, lines))
-    if omitted_add == 0 and omitted_del == 0:
-        status = 'full'
-    elif omitted_add == total_add and omitted_del == total_del:
-        status = 'omitted'
-    else:
-        status = 'partial'
+    status = _file_telemetry_status(omitted_add, omitted_del, total_add, total_del)
     return (
         {
             'path': fi.path,
@@ -643,6 +669,19 @@ def _file_telemetry(
         },
         status,
     )
+
+
+def _file_telemetry_status(
+    omitted_add: int,
+    omitted_del: int,
+    total_add: int,
+    total_del: int,
+) -> str:
+    if omitted_add == 0 and omitted_del == 0:
+        return 'full'
+    if omitted_add == total_add and omitted_del == total_del:
+        return 'omitted'
+    return 'partial'
 
 
 def _build_telemetry(

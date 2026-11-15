@@ -12,29 +12,38 @@ _VALID_SOURCES = frozenset({CRITERION_SOURCE_STATED, CRITERION_SOURCE_INFERRED})
 _CRITERION_ID_RE = re.compile(r'^ac(\d+)$', re.IGNORECASE)
 
 
+def _normalize_assertion(item: dict[str, Any]) -> str:
+    assertion = str(item.get('assertion') or '').strip()
+    if not assertion:
+        msg = "Criterion 'assertion' is required and must be non-empty"
+        raise TypeError(msg)
+    return assertion
+
+
+def _normalize_source(item: dict[str, Any]) -> str:
+    source = str(item.get('source') or CRITERION_SOURCE_STATED).strip().lower()
+    if source not in _VALID_SOURCES:
+        msg = f"Criterion 'source' must be one of: {', '.join(sorted(_VALID_SOURCES))}"
+        raise TypeError(msg)
+    return source
+
+
+def _normalize_evidence(item: dict[str, Any]) -> str | None:
+    evidence_raw = item.get('evidence')
+    if evidence_raw is None:
+        return None
+    return str(evidence_raw).strip() or None
+
+
 def normalize_criterion_payload(item: Any) -> dict[str, Any]:
     """Normalize a single acceptance criterion to the canonical schema."""
     if not isinstance(item, dict):
         msg = f'Criterion must be a dictionary, got {type(item)}'
         raise TypeError(msg)
 
-    assertion = str(item.get('assertion') or '').strip()
-    if not assertion:
-        msg = "Criterion 'assertion' is required and must be non-empty"
-        raise TypeError(msg)
-
-    source = str(item.get('source') or CRITERION_SOURCE_STATED).strip().lower()
-    if source not in _VALID_SOURCES:
-        msg = f"Criterion 'source' must be one of: {', '.join(sorted(_VALID_SOURCES))}"
-        raise TypeError(msg)
-
-    evidence_raw = item.get('evidence')
-    evidence: str | None
-    if evidence_raw is None:
-        evidence = None
-    else:
-        evidence = str(evidence_raw).strip() or None
-
+    assertion = _normalize_assertion(item)
+    source = _normalize_source(item)
+    evidence = _normalize_evidence(item)
     criterion_id = str(item.get('id') or '').strip() or None
 
     result: dict[str, Any] = {
@@ -51,25 +60,31 @@ def normalize_criterion_payload(item: Any) -> dict[str, Any]:
     return result
 
 
+def _normalize_change_entry(entry: Any) -> dict[str, str] | None:
+    if not isinstance(entry, dict):
+        return None
+    old_assertion = str(entry.get('old_assertion') or '').strip()
+    new_assertion = str(entry.get('new_assertion') or '').strip()
+    reason = str(entry.get('reason') or '').strip()
+    at = str(entry.get('at') or '').strip()
+    if not old_assertion or not new_assertion or not reason:
+        return None
+    row: dict[str, str] = {
+        'old_assertion': old_assertion,
+        'new_assertion': new_assertion,
+        'reason': reason,
+    }
+    if at:
+        row['at'] = at
+    return row
+
+
 def _normalize_changes(changes: list[Any]) -> list[dict[str, str]]:
     normalized: list[dict[str, str]] = []
     for entry in changes:
-        if not isinstance(entry, dict):
-            continue
-        old_assertion = str(entry.get('old_assertion') or '').strip()
-        new_assertion = str(entry.get('new_assertion') or '').strip()
-        reason = str(entry.get('reason') or '').strip()
-        at = str(entry.get('at') or '').strip()
-        if not old_assertion or not new_assertion or not reason:
-            continue
-        row: dict[str, str] = {
-            'old_assertion': old_assertion,
-            'new_assertion': new_assertion,
-            'reason': reason,
-        }
-        if at:
-            row['at'] = at
-        normalized.append(row)
+        row = _normalize_change_entry(entry)
+        if row is not None:
+            normalized.append(row)
     return normalized
 
 

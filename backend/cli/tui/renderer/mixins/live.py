@@ -183,6 +183,58 @@ class RendererLiveMixin:
         if not self._display_is_mock():
             self._follow_transcript_tail_after_reflow(display)
 
+    def _update_mock_live_response(self, display: Any, text: str) -> None:
+        if not self._live_response_dirty:
+            self.clear_live_response()
+            return
+        display.clear()
+        display.write(text)
+
+    def _ensure_live_response_widget(self, display: Any) -> None:
+        if self._live_response_widget:
+            return
+        from backend.cli.tui.widgets.activity_card import LiveResponse
+
+        self._live_response_widget = LiveResponse()
+        display.append_widget(self._live_response_widget)
+
+    def _restore_live_response_scroll_anchor(
+        self, display: Any, anchor_scroll_y: float | None
+    ) -> None:
+        if anchor_scroll_y is None or not getattr(
+            display, '_user_scrolled_away', False
+        ):
+            return
+
+        def _restore_scroll_anchor() -> None:
+            if not getattr(display, '_user_scrolled_away', False):
+                return
+            try:
+                display._suppress_scroll_sync = True
+                display.scroll_to(
+                    y=anchor_scroll_y,
+                    animate=False,
+                    immediate=True,
+                )
+                display.call_after_refresh(display._release_programmatic_scroll)
+            except Exception:
+                pass
+
+        display.call_after_refresh(_restore_scroll_anchor)
+        display.note_tail_activity()
+
+    def _follow_live_response_tail(
+        self, display: Any, *, in_place_update: bool
+    ) -> None:
+        follow_tail = getattr(display, 'follow_tail', None)
+        if not callable(follow_tail):
+            self._maybe_scroll_to_tail(display)
+            return
+        if in_place_update:
+            self._follow_transcript_tail_after_reflow(display)
+        else:
+            follow_tail()
+
     def update_live_response(self, text: str) -> None:
         """Update the in-flight assistant response in-place."""
         if (
@@ -195,11 +247,7 @@ class RendererLiveMixin:
 
         display = self._tui._get_display()
         if self._display_is_mock():
-            if not self._live_response_dirty:
-                self.clear_live_response()
-                return
-            display.clear()
-            display.write(text)
+            self._update_mock_live_response(display, text)
             return
 
         if not text.strip():
@@ -208,46 +256,16 @@ class RendererLiveMixin:
 
         should_follow = display.should_follow_tail()
         in_place_update = self._live_response_widget is not None
-        if not self._live_response_widget:
-            from backend.cli.tui.widgets.activity_card import LiveResponse
-
-            self._live_response_widget = LiveResponse()
-            display.append_widget(self._live_response_widget)
+        self._ensure_live_response_widget(display)
 
         self._live_response_pending_text = text
         anchor_scroll_y: float | None = None
         if not should_follow and in_place_update:
             anchor_scroll_y = float(display.scroll_y)
         self._apply_live_response_render(text)
-        if anchor_scroll_y is not None and getattr(
-            display, '_user_scrolled_away', False
-        ):
-
-            def _restore_scroll_anchor() -> None:
-                if not getattr(display, '_user_scrolled_away', False):
-                    return
-                try:
-                    display._suppress_scroll_sync = True
-                    display.scroll_to(
-                        y=anchor_scroll_y,
-                        animate=False,
-                        immediate=True,
-                    )
-                    display.call_after_refresh(display._release_programmatic_scroll)
-                except Exception:
-                    pass
-
-            display.call_after_refresh(_restore_scroll_anchor)
-            display.note_tail_activity()
+        self._restore_live_response_scroll_anchor(display, anchor_scroll_y)
         if should_follow:
-            follow_tail = getattr(display, 'follow_tail', None)
-            if callable(follow_tail):
-                if in_place_update:
-                    self._follow_transcript_tail_after_reflow(display)
-                else:
-                    follow_tail()
-            else:
-                self._maybe_scroll_to_tail(display)
+            self._follow_live_response_tail(display, in_place_update=in_place_update)
 
     def clear_live_response(self) -> None:
         """Clear the in-flight response preview widget."""

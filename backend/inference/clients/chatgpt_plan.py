@@ -82,45 +82,57 @@ class ChatGPTPlanClient(CodexResponsesClient):
             timeout=self._timeout or 120,
         )
 
-    def _build_payload(self, messages, kwargs):
-        # The common OpenAI-compatible sanitizer tunnels reasoning_effort into
-        # extra_body. This direct Responses client must recover that setting
-        # before the shared message converter builds the request body.
+    @staticmethod
+    def _restore_reasoning_effort(kwargs):
         kwargs = dict(kwargs)
         extra_body = kwargs.get('extra_body') or {}
         if 'reasoning_effort' not in kwargs and 'reasoning_effort' in extra_body:
             kwargs['reasoning_effort'] = extra_body['reasoning_effort']
-        payload = super()._build_payload(messages, kwargs)
-        # SDK timeout is a local option, not part of the relay's JSON API body.
-        if os.environ.get('GRINTA_SUBSCRIPTION_STDIO'):
-            payload.pop('timeout', None)
+        return kwargs
+
+    @staticmethod
+    def _namespace_tools(payload):
         tools = payload.get('tools', [])
         if any(tool.get('type') != 'function' for tool in tools):
             raise ValueError(
                 'ChatGPT-plan provider currently supports Grinta function tools only'
             )
-        if tools:
-            choice = payload.get('tool_choice')
-            if isinstance(choice, dict) and choice.get('type') == 'function':
-                tools = [tool for tool in tools if tool['name'] == choice['name']]
-                if not tools:
-                    raise ValueError('Selected function was not declared')
-                # This endpoint rejects tool_choice.namespace. Limit the
-                # namespace to the selected function and require a tool call.
-                payload['tool_choice'] = 'required'
-            payload['tools'] = [
-                {
-                    'type': 'namespace',
-                    'name': 'grinta',
-                    'description': 'Tools executed by Grinta',
-                    'tools': tools,
-                }
-            ]
+        if not tools:
+            return
+        choice = payload.get('tool_choice')
+        if isinstance(choice, dict) and choice.get('type') == 'function':
+            tools = [tool for tool in tools if tool['name'] == choice['name']]
+            if not tools:
+                raise ValueError('Selected function was not declared')
+            payload['tool_choice'] = 'required'
+        payload['tools'] = [
+            {
+                'type': 'namespace',
+                'name': 'grinta',
+                'description': 'Tools executed by Grinta',
+                'tools': tools,
+            }
+        ]
+
+    @staticmethod
+    def _observe_request_budget(payload):
         from backend.inference.comparison_scope import active_budget
 
         budget = active_budget.get()
         if budget is not None:
             budget.observe_request(payload)
+
+    def _build_payload(self, messages, kwargs):
+        # The common OpenAI-compatible sanitizer tunnels reasoning_effort into
+        # extra_body. This direct Responses client must recover that setting
+        # before the shared message converter builds the request body.
+        kwargs = self._restore_reasoning_effort(kwargs)
+        payload = super()._build_payload(messages, kwargs)
+        # SDK timeout is a local option, not part of the relay's JSON API body.
+        if os.environ.get('GRINTA_SUBSCRIPTION_STDIO'):
+            payload.pop('timeout', None)
+        self._namespace_tools(payload)
+        self._observe_request_budget(payload)
         return payload
 
     @staticmethod

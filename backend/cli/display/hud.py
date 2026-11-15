@@ -122,25 +122,26 @@ class HUDBar:
         return '…' + path[-tail_len:]
 
     @staticmethod
+    def _workspace_path_parts(path: str) -> list[str]:
+        normalized = path.replace('\\', '/').rstrip('/')
+        return [part for part in normalized.split('/') if part and part != '.']
+
+    @staticmethod
     def compact_workspace_label(path: str, max_len: int = 28) -> str:
         """Show the leaf directory name with a leading ellipsis when nested."""
         raw = (path or '').strip()
         if not raw or max_len < 2:
             return raw
-        normalized = raw.replace('\\', '/').rstrip('/')
-        parts = [part for part in normalized.split('/') if part and part != '.']
+        parts = HUDBar._workspace_path_parts(raw)
         if not parts:
             return raw[:max_len]
         leaf = parts[-1]
         if len(parts) == 1:
-            return leaf if len(leaf) <= max_len else leaf[:max_len]
-        prefix = '…/'
-        budget = max_len - len(prefix)
+            return leaf[:max_len]
+        budget = max_len - len('…/')
         if budget < 1:
             return leaf[:max_len]
-        if len(leaf) <= budget:
-            return f'{prefix}{leaf}'
-        return f'{prefix}{leaf[:budget]}'
+        return f'…/{leaf[:budget]}'
 
     @staticmethod
     def _describe_model_via_resolver(raw: str) -> tuple[str, str]:
@@ -305,24 +306,33 @@ class HUDBar:
         raw = extra_data.get('prompt_token_accounting')
         return raw if isinstance(raw, dict) else None
 
+    @staticmethod
+    def _parse_int_or_zero(value: Any) -> int:
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return 0
+
+    @staticmethod
+    def _positive_token_value(accounting: dict[str, Any], key: str) -> int:
+        value = accounting.get(key)
+        if value is None or isinstance(value, bool):
+            return 0
+        parsed = HUDBar._parse_int_or_zero(value)
+        return parsed if parsed > 0 else 0
+
     def apply_prompt_token_accounting(self, accounting: dict[str, Any] | None) -> None:
         """Apply the latest internal prompt composition estimate to HUD context pressure."""
         if not isinstance(accounting, dict):
             return
         full = accounting.get('full_request_tokens')
         if full is not None and not isinstance(full, bool):
-            try:
-                parsed_full = int(full)
-            except (TypeError, ValueError):
-                parsed_full = 0
+            parsed_full = self._parse_int_or_zero(full)
             if parsed_full > 0:
                 self.state.context_tokens = parsed_full
         window = accounting.get('context_window')
         if window is not None and not isinstance(window, bool):
-            try:
-                parsed_window = int(window)
-            except (TypeError, ValueError):
-                parsed_window = 0
+            parsed_window = self._parse_int_or_zero(window)
             if parsed_window > 0:
                 self.state.context_limit = parsed_window
         elif self.state.context_limit <= 0:
@@ -422,21 +432,14 @@ class HUDBar:
         if not isinstance(post_compact, int) or post_compact <= 0:
             return None
         accounting = HUDBar._prompt_token_accounting_from_extra(extra_data) or {}
-        fixed = 0
-        for key in (
-            'static_prompt_tokens',
-            'context_packet_tokens',
-            'tool_schema_tokens',
-        ):
-            value = accounting.get(key)
-            if value is None or isinstance(value, bool):
-                continue
-            try:
-                parsed = int(value)
-            except (TypeError, ValueError):
-                continue
-            if parsed > 0:
-                fixed += parsed
+        fixed = sum(
+            HUDBar._positive_token_value(accounting, key)
+            for key in (
+                'static_prompt_tokens',
+                'context_packet_tokens',
+                'tool_schema_tokens',
+            )
+        )
         return post_compact + fixed
 
     def apply_post_compaction_context(self, extra_data: Any) -> None:

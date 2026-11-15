@@ -195,28 +195,11 @@ def passes_effectiveness_gate(
     return bool((action.summary or '').strip())
 
 
-def evaluate_continuity_gate(
+def _canonical_continuity_part(
     state: State,
     history: list[Event],
-    action: CondensationAction,
-) -> _ContinuityGateDecision:
-    if not action.summary:
-        return _ContinuityGateDecision(
-            passed=True,
-            canonical_ok=True,
-            fingerprint='no_summary',
-            missing=(),
-            score=1.0,
-            matched=0,
-            total=0,
-        )
-    from backend.context.compactor.pre_condensation_snapshot import (
-        extract_snapshot,
-        format_snapshot_for_injection,
-    )
-
-    snapshot = extract_snapshot(history)
-    restored_parts = [action.summary]
+    snapshot: dict[str, Any],
+) -> str:
     try:
         canonical = load_canonical_state(state=state)
         files_touched = snapshot.get('files_touched', {})
@@ -238,73 +221,97 @@ def evaluate_continuity_gate(
                 source='continuity_gate',
             )
             save_canonical_state(canonical, state=state)
-        canonical_rendered = render_canonical_state_for_prompt(canonical)
-        if canonical_rendered:
-            restored_parts.append(canonical_rendered)
+        return render_canonical_state_for_prompt(canonical)
     except Exception:
         logger.debug('Canonical continuity render failed', exc_info=True)
+        return ''
+
+
+def _snapshot_continuity_part(
+    state: State,
+    snapshot: dict[str, Any],
+    format_snapshot: Any,
+) -> str:
     try:
-        snapshot_text = format_snapshot_for_injection(snapshot, state=state)
-        if snapshot_text.strip():
-            restored_parts.append(snapshot_text)
+        snapshot_text = format_snapshot(snapshot, state=state)
     except Exception:
         logger.debug('Snapshot continuity render failed', exc_info=True)
-    restored = '\n\n'.join(part for part in restored_parts if part.strip())
-    passed, result = compaction_passes_continuity_gate(history, restored)
-    canonical_result = validate_canonical_state_for_compaction(
-        load_canonical_state(state=state),
-        history,
+        return ''
+    if snapshot_text.strip():
+        return snapshot_text
+    return ''
+
+
+def _continuity_missing_items(result: Any) -> tuple[str, ...]:
+    return tuple(f'{fact.category}:{fact.key[:80]}' for fact in result.missing[:8])
+
+
+def _join_or_none(items: Any) -> str:
+    return ', '.join(items) or 'none'
+
+
+def _gate_decision(
+    *,
+    passed: bool,
+    canonical_ok: bool,
+    fingerprint: str,
+    missing: tuple[str, ...],
+    score: float,
+    matched: int,
+    total: int,
+) -> _ContinuityGateDecision:
+    return _ContinuityGateDecision(
+        passed=passed,
+        canonical_ok=canonical_ok,
+        fingerprint=fingerprint,
+        missing=missing,
+        score=score,
+        matched=matched,
+        total=total,
     )
-    task_plan_source, ac_source = _continuity_source_labels(history)
-    goal_context_chars = _goal_context_char_count(state)
-    fuzzy_missing = tuple(
-        f'{fact.category}:{fact.key[:80]}' for fact in result.missing[:8]
+
+
+def _canonical_failure_decision(
+    canonical_result: Any,
+    result: Any,
+) -> _ContinuityGateDecision:
+    logger.warning(
+        'Compaction canonical continuity failed: missing=%s',
+        ', '.join(canonical_result.missing),
     )
-    logger.info(
-        'Compaction continuity telemetry canonical_missing=%s fuzzy_missing=%s '
-        'goal_context_chars=%d task_plan_source=%s ac_source=%s score=%.2f',
-        ', '.join(canonical_result.missing) or 'none',
-        ', '.join(fuzzy_missing) or 'none',
-        goal_context_chars,
-        task_plan_source,
-        ac_source,
+    return _gate_decision(
+        passed=False,
+        canonical_ok=False,
+        fingerprint='canonical:' + '|'.join(sorted(canonical_result.missing)),
+        missing=tuple(canonical_result.missing),
+        score=result.score,
+        matched=result.matched,
+        total=result.total,
+    )
+
+
+def _continuity_failure_decision(result: Any) -> _ContinuityGateDecision:
+    missing_items = _continuity_missing_items(result)
+    logger.warning(
+        'Compaction continuity metric score=%.2f matched=%d/%d missing=%s '
+        '(boundary rejected)',
         result.score,
+        result.matched,
+        result.total,
+        _join_or_none(missing_items),
     )
-    if not canonical_result.ok:
-        logger.warning(
-            'Compaction canonical continuity failed: missing=%s',
-            ', '.join(canonical_result.missing),
-        )
-        return _ContinuityGateDecision(
-            passed=False,
-            canonical_ok=False,
-            fingerprint='canonical:' + '|'.join(sorted(canonical_result.missing)),
-            missing=tuple(canonical_result.missing),
-            score=result.score,
-            matched=result.matched,
-            total=result.total,
-        )
-    if not passed:
-        missing_items = tuple(
-            f'{fact.category}:{fact.key[:80]}' for fact in result.missing[:8]
-        )
-        logger.warning(
-            'Compaction continuity metric score=%.2f matched=%d/%d missing=%s '
-            '(boundary rejected)',
-            result.score,
-            result.matched,
-            result.total,
-            ', '.join(missing_items) or 'none',
-        )
-        return _ContinuityGateDecision(
-            passed=False,
-            canonical_ok=True,
-            fingerprint='continuity:' + '|'.join(sorted(missing_items)),
-            missing=missing_items,
-            score=result.score,
-            matched=result.matched,
-            total=result.total,
-        )
+    return _gate_decision(
+        passed=False,
+        canonical_ok=True,
+        fingerprint='continuity:' + '|'.join(sorted(missing_items)),
+        missing=missing_items,
+        score=result.score,
+        matched=result.matched,
+        total=result.total,
+    )
+
+
+def _passing_continuity_decision(result: Any) -> _ContinuityGateDecision:
     if result.missing:
         logger.info(
             'Compaction continuity telemetry score=%.2f matched=%d/%d missing=%d',
@@ -313,7 +320,7 @@ def evaluate_continuity_gate(
             result.total,
             len(result.missing),
         )
-    return _ContinuityGateDecision(
+    return _gate_decision(
         passed=True,
         canonical_ok=True,
         fingerprint='ok',
@@ -322,6 +329,85 @@ def evaluate_continuity_gate(
         matched=result.matched,
         total=result.total,
     )
+
+
+def _build_restored_summary(
+    state: State,
+    history: list[Event],
+    summary: str,
+    snapshot: dict[str, Any],
+    format_snapshot: Any,
+) -> str:
+    restored_parts = [summary]
+    canonical_part = _canonical_continuity_part(state, history, snapshot)
+    if canonical_part:
+        restored_parts.append(canonical_part)
+    snapshot_part = _snapshot_continuity_part(state, snapshot, format_snapshot)
+    if snapshot_part:
+        restored_parts.append(snapshot_part)
+    return '\n\n'.join(part for part in restored_parts if part.strip())
+
+
+def _log_continuity_telemetry(
+    state: State,
+    history: list[Event],
+    result: Any,
+    canonical_result: Any,
+) -> None:
+    task_plan_source, ac_source = _continuity_source_labels(history)
+    goal_context_chars = _goal_context_char_count(state)
+    fuzzy_missing = _continuity_missing_items(result)
+    logger.info(
+        'Compaction continuity telemetry canonical_missing=%s fuzzy_missing=%s '
+        'goal_context_chars=%d task_plan_source=%s ac_source=%s score=%.2f',
+        _join_or_none(canonical_result.missing),
+        _join_or_none(fuzzy_missing),
+        goal_context_chars,
+        task_plan_source,
+        ac_source,
+        result.score,
+    )
+
+
+def evaluate_continuity_gate(
+    state: State,
+    history: list[Event],
+    action: CondensationAction,
+) -> _ContinuityGateDecision:
+    if not action.summary:
+        return _gate_decision(
+            passed=True,
+            canonical_ok=True,
+            fingerprint='no_summary',
+            missing=(),
+            score=1.0,
+            matched=0,
+            total=0,
+        )
+    from backend.context.compactor.pre_condensation_snapshot import (
+        extract_snapshot,
+        format_snapshot_for_injection,
+    )
+
+    snapshot = extract_snapshot(history)
+    restored = _build_restored_summary(
+        state,
+        history,
+        action.summary,
+        snapshot,
+        format_snapshot_for_injection,
+    )
+    passed, result = compaction_passes_continuity_gate(history, restored)
+    canonical_result = validate_canonical_state_for_compaction(
+        load_canonical_state(state=state),
+        history,
+    )
+    _log_continuity_telemetry(state, history, result, canonical_result)
+    if not canonical_result.ok:
+        return _canonical_failure_decision(canonical_result, result)
+    if not passed:
+        return _continuity_failure_decision(result)
+    return _passing_continuity_decision(result)
 
 
 def _continuity_source_labels(history: list[Event]) -> tuple[str, str]:

@@ -394,6 +394,36 @@ class ScreenInputMixin:
                 f'action_submit_input: create_task FAILED: {type(exc).__name__}: {exc}'
             )
 
+    def _submit_normalized_text(self) -> str:
+        ta = self.query_one('#input', TextArea)
+        clean_text = _strip_terminal_control_literals(ta.text)
+        if clean_text != ta.text:
+            ta.text = clean_text
+        return _strip_ansi(clean_text).strip()
+
+    def _submit_is_blocked(self, is_slash: bool) -> bool:
+        if getattr(self, '_turn_in_flight', False) and not is_slash:
+            _tui_logger.debug('action_submit_input: turn in flight, ignoring')
+            return True
+        if self._input_lock.locked() and not is_slash:
+            _tui_logger.debug('action_submit_input: lock held, ignoring')
+            return True
+        return False
+
+    def _submit_reject_blocked_images(self, pending_images: list[Any]) -> bool:
+        if not pending_images:
+            return False
+        blocked = self._image_input_blocked_reason()
+        if not blocked:
+            return False
+        self._reject_image_input(blocked)
+        return True
+
+    def _submit_record_history(self, text: str) -> None:
+        if not self._command_history or self._command_history[-1] != text:
+            self._command_history.append(text)
+        self._history_index = -1
+
     def action_submit_input(self) -> None:
         from backend.cli.tui.widgets.scan_line import ScanLineCard
 
@@ -401,38 +431,27 @@ class ScreenInputMixin:
         if isinstance(focused, ScanLineCard):
             focused.action_open_detail()
             return
-        ta = self.query_one('#input', TextArea)
-        clean_text = _strip_terminal_control_literals(ta.text)
-        if clean_text != ta.text:
-            ta.text = clean_text
-        text = _strip_ansi(clean_text).strip()
+        text = self._submit_normalized_text()
         is_slash = text.startswith('/')
         _tui_logger.debug(
             f'action_submit_input: lock_locked={self._input_lock.locked()} '
             f'turn_in_flight={getattr(self, "_turn_in_flight", False)} '
             f'is_slash={is_slash}'
         )
-        if getattr(self, '_turn_in_flight', False) and not is_slash:
-            _tui_logger.debug('action_submit_input: turn in flight, ignoring')
-            return
-        if self._input_lock.locked() and not is_slash:
-            _tui_logger.debug('action_submit_input: lock held, ignoring')
+        if self._submit_is_blocked(is_slash):
             return
         pending_images = list(getattr(self, '_pending_image_urls', []) or [])
         _tui_logger.debug(f'action_submit_input: text_len={len(text)}')
         if not text and not pending_images:
             self._submit_handle_empty_text()
             return
-        if pending_images and (blocked := self._image_input_blocked_reason()):
-            self._reject_image_input(blocked)
+        if self._submit_reject_blocked_images(pending_images):
             return
-        if text.startswith('/'):
+        if is_slash:
             self._submit_spawn_input_task(text)
             return
         self._submit_clear_ui_state()
-        if not self._command_history or self._command_history[-1] != text:
-            self._command_history.append(text)
-        self._history_index = -1
+        self._submit_record_history(text)
         _tui_logger.debug('action_submit_input: creating task for _handle_input')
         self._submit_spawn_input_task(text)
 
@@ -544,6 +563,37 @@ class ScreenInputMixin:
             self._render_hud_bar()
             self._turn_in_flight = False
 
+    async def _handle_agent_input(self, text: str) -> tuple[list[str] | None, bool]:
+        image_urls = list(getattr(self, '_pending_image_urls', []) or [])
+        if image_urls and (blocked := self._image_input_blocked_reason()):
+            self._reject_image_input(blocked)
+            return None, False
+
+        await self._handle_input_prepare_ui()
+
+        self._pending_image_urls = []
+        self._refresh_input_attachment_hint()
+        self._render_hud_bar()
+        self.query_one('#input-bar', InputBar).add_class('processing')
+
+        try:
+            _tui_logger.debug(
+                f'_handle_input: controller={self._controller is not None}'
+            )
+            await self._ensure_controller_ready()
+            assert self._controller is not None, (
+                'Controller must be initialized after agent task setup'
+            )
+            if getattr(self, '_pending_llm_config_apply', False):
+                self._apply_llm_config_to_active_session(self._config)
+            self._last_user_message = text
+            self.add_user_message(text, image_count=len(image_urls))
+            self._turn_in_flight = True
+        except Exception as exc:
+            self._handle_input_error(exc)
+            return None, False
+        return image_urls, True
+
     async def _handle_input(self, text: str) -> None:
         try:
             _tui_logger.debug(f'_handle_input ENTER text={text[:80]}')
@@ -563,35 +613,10 @@ class ScreenInputMixin:
                 _tui_logger.debug('_handle_input: turn already in flight, ignoring')
                 return
             else:
-                image_urls = list(getattr(self, '_pending_image_urls', []) or [])
-                if image_urls and (blocked := self._image_input_blocked_reason()):
-                    self._reject_image_input(blocked)
+                image_urls, proceed = await self._handle_agent_input(text)
+                if not proceed:
                     return
-
-                await self._handle_input_prepare_ui()
-
-                self._pending_image_urls = []
-                self._refresh_input_attachment_hint()
-                self._render_hud_bar()
-                self.query_one('#input-bar', InputBar).add_class('processing')
-
-                try:
-                    _tui_logger.debug(
-                        f'_handle_input: controller={self._controller is not None}'
-                    )
-                    await self._ensure_controller_ready()
-                    assert self._controller is not None, (
-                        'Controller must be initialized after agent task setup'
-                    )
-                    if getattr(self, '_pending_llm_config_apply', False):
-                        self._apply_llm_config_to_active_session(self._config)
-                    self._last_user_message = text
-                    self.add_user_message(text, image_count=len(image_urls))
-                    agent_text = text
-                    self._turn_in_flight = True
-                except Exception as exc:
-                    self._handle_input_error(exc)
-                    return
+                agent_text = text
 
         if agent_text is None:
             if slash_followup is not None:

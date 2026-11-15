@@ -15,6 +15,39 @@ from backend.engine.prompts.section_renderers._env_hints import (
 )
 
 
+def _routing_env_line(
+    is_windows: bool,
+    windows_with_bash: bool,
+    terminal_available: bool,
+) -> str:
+    if not terminal_available:
+        return ''
+    if not is_windows:
+        return 'Use **bash** for environment actions (install, build, test, git, processes). '
+    if windows_with_bash:
+        return (
+            'Use **bash** (Git Bash on Windows) for environment actions '
+            '(install, build, test, git, processes). '
+        )
+    return 'Use **PowerShell** for environment actions (install, build, test, git, processes). '
+
+
+def _routing_ladders(can_edit: bool, terminal_available: bool) -> tuple[str, str]:
+    if not can_edit:
+        return '', ''
+    read_and_edit_ladder = (
+        '- **Read & Edit:** Follow `<EDITOR_AND_FILE_OPERATIONS>` — '
+        'do not use shell commands to write source files.'
+    )
+    shell_and_execution_ladder = (
+        '- **Shell & Execution:** Use `terminal` for environment/runtime inspection, '
+        'builds, tests, git, and process lifecycles. Use `<DISCOVERY_ROUTING>` for repository intelligence.'
+        if terminal_available
+        else ''
+    )
+    return read_and_edit_ladder, shell_and_execution_ladder
+
+
 def _render_routing(
     render_partial: Callable[..., str],
     is_windows: bool,
@@ -40,17 +73,7 @@ def _render_routing(
     working_memory_on = getattr(config, 'enable_working_memory', True)
     tracker_on = getattr(config, 'enable_task_tracker_tool', True)
     criteria_on = getattr(config, 'enable_acceptance_criteria_tool', True)
-    if not terminal_available:
-        env_line = ''
-    elif not is_windows:
-        env_line = 'Use **bash** for environment actions (install, build, test, git, processes). '
-    elif windows_with_bash:
-        env_line = (
-            'Use **bash** (Git Bash on Windows) for environment actions '
-            '(install, build, test, git, processes). '
-        )
-    else:
-        env_line = 'Use **PowerShell** for environment actions (install, build, test, git, processes). '
+    env_line = _routing_env_line(is_windows, windows_with_bash, terminal_available)
     discovery = _repo_discovery_contract(
         is_windows=is_windows,
         windows_with_bash=windows_with_bash,
@@ -92,20 +115,10 @@ def _render_routing(
         browser_on=browser_tool_enabled(config) and can_edit,
     )
 
-    if not can_edit:
-        read_and_edit_ladder = ''
-        shell_and_execution_ladder = ''
-    else:
-        read_and_edit_ladder = (
-            '- **Read & Edit:** Follow `<EDITOR_AND_FILE_OPERATIONS>` — '
-            'do not use shell commands to write source files.'
-        )
-        shell_and_execution_ladder = (
-            '- **Shell & Execution:** Use `terminal` for environment/runtime inspection, '
-            'builds, tests, git, and process lifecycles. Use `<DISCOVERY_ROUTING>` for repository intelligence.'
-            if terminal_available
-            else ''
-        )
+    read_and_edit_ladder, shell_and_execution_ladder = _routing_ladders(
+        can_edit,
+        terminal_available,
+    )
 
     return render_partial(
         'system_partial_00_routing.md',

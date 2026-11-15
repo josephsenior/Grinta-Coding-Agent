@@ -13,7 +13,7 @@ from backend.inference.capabilities.context_limits import (
     limits_from_catalog,
 )
 from backend.inference.capabilities.param_profiles import resolve_param_profile_id
-from backend.inference.catalog.catalog_loader import lookup
+from backend.inference.catalog.catalog_loader import ModelEntry, lookup
 from backend.inference.catalog.provider_catalog import normalize_provider_name
 
 _RUNTIME_PROFILE_KEY = '_grinta_runtime_profile'
@@ -61,6 +61,95 @@ def _combine_source(param_source: str, limits_source: str) -> str:
     return param_source
 
 
+def _configured_context_limits(
+    configured_context: int,
+    configured_output: int | None,
+    budget_output: int | None,
+    configured_input: int | None,
+) -> ModelContextLimits:
+    usable = derive_usable_input_tokens(
+        context_window_tokens=configured_context,
+        max_output_tokens=budget_output,
+        fallback_input_tokens=configured_input,
+    )
+    return ModelContextLimits(
+        configured_context,
+        configured_output,
+        usable,
+        'settings_override',
+    )
+
+
+def _catalog_context_limits(
+    catalog: ModelContextLimits,
+    configured_output: int | None,
+    budget_output: int | None,
+    configured_input: int | None,
+) -> ModelContextLimits:
+    max_output = configured_output or catalog.max_output_tokens
+    reservation_output = budget_output or catalog.max_output_tokens
+    usable = derive_usable_input_tokens(
+        context_window_tokens=catalog.context_window_tokens,
+        max_output_tokens=reservation_output,
+        fallback_input_tokens=configured_input or catalog.usable_input_tokens,
+    )
+    return ModelContextLimits(
+        catalog.context_window_tokens,
+        max_output,
+        usable,
+        catalog.source,
+    )
+
+
+def _configured_input_context_limits(
+    configured_input: int,
+    configured_output: int | None,
+    budget_output: int | None,
+) -> ModelContextLimits:
+    context = configured_input + (budget_output or 0)
+    return ModelContextLimits(
+        context,
+        configured_output,
+        configured_input,
+        'settings_override',
+    )
+
+
+def _entry_context_limits(
+    entry: ModelEntry,
+    configured_output: int | None,
+    budget_output: int | None,
+) -> ModelContextLimits:
+    max_output = configured_output or entry.max_output_tokens
+    reservation_output = budget_output or entry.max_output_tokens
+    usable = derive_usable_input_tokens(
+        context_window_tokens=entry.context_window_tokens,
+        max_output_tokens=reservation_output,
+    )
+    return ModelContextLimits(
+        entry.context_window_tokens,
+        max_output,
+        usable,
+        'catalog',
+    )
+
+
+def _unknown_context_limits(
+    configured_output: int | None,
+    budget_output: int | None,
+) -> ModelContextLimits:
+    usable = derive_usable_input_tokens(
+        context_window_tokens=DEFAULT_UNKNOWN_CONTEXT_WINDOW_TOKENS,
+        max_output_tokens=budget_output,
+    )
+    return ModelContextLimits(
+        DEFAULT_UNKNOWN_CONTEXT_WINDOW_TOKENS,
+        configured_output,
+        usable,
+        'provider_default',
+    )
+
+
 def _resolve_context_limits(
     llm_config: object | None,
     model: str,
@@ -76,16 +165,11 @@ def _resolve_context_limits(
     configured_input = _positive_int(getattr(llm_config, 'max_input_tokens', None))
 
     if configured_context is not None:
-        usable = derive_usable_input_tokens(
-            context_window_tokens=configured_context,
-            max_output_tokens=budget_output,
-            fallback_input_tokens=configured_input,
-        )
-        return ModelContextLimits(
+        return _configured_context_limits(
             configured_context,
             configured_output,
-            usable,
-            'settings_override',
+            budget_output,
+            configured_input,
         )
 
     catalog = limits_from_catalog(model)
@@ -93,54 +177,25 @@ def _resolve_context_limits(
         catalog.context_window_tokens is not None
         or catalog.usable_input_tokens is not None
     ):
-        max_output = configured_output or catalog.max_output_tokens
-        reservation_output = budget_output or catalog.max_output_tokens
-        usable = derive_usable_input_tokens(
-            context_window_tokens=catalog.context_window_tokens,
-            max_output_tokens=reservation_output,
-            fallback_input_tokens=configured_input or catalog.usable_input_tokens,
-        )
-        return ModelContextLimits(
-            catalog.context_window_tokens,
-            max_output,
-            usable,
-            catalog.source,
+        return _catalog_context_limits(
+            catalog,
+            configured_output,
+            budget_output,
+            configured_input,
         )
 
     if configured_input is not None:
-        context = configured_input + (budget_output or 0)
-        return ModelContextLimits(
-            context,
-            configured_output,
+        return _configured_input_context_limits(
             configured_input,
-            'settings_override',
+            configured_output,
+            budget_output,
         )
 
     entry = lookup(model)
     if entry is not None and entry.context_window_tokens:
-        max_output = configured_output or entry.max_output_tokens
-        reservation_output = budget_output or entry.max_output_tokens
-        usable = derive_usable_input_tokens(
-            context_window_tokens=entry.context_window_tokens,
-            max_output_tokens=reservation_output,
-        )
-        return ModelContextLimits(
-            entry.context_window_tokens,
-            max_output,
-            usable,
-            'catalog',
-        )
+        return _entry_context_limits(entry, configured_output, budget_output)
 
-    usable = derive_usable_input_tokens(
-        context_window_tokens=DEFAULT_UNKNOWN_CONTEXT_WINDOW_TOKENS,
-        max_output_tokens=budget_output,
-    )
-    return ModelContextLimits(
-        DEFAULT_UNKNOWN_CONTEXT_WINDOW_TOKENS,
-        configured_output,
-        usable,
-        'provider_default',
-    )
+    return _unknown_context_limits(configured_output, budget_output)
 
 
 def attach_runtime_profile(llm_config: object, profile: RuntimeModelProfile) -> None:

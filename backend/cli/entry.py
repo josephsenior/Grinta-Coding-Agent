@@ -22,6 +22,7 @@ import os
 import sys
 import warnings
 from pathlib import Path
+from typing import Any
 
 # Pin install paths before any backend import resolves logging or settings.
 from backend.core.runtime_paths import pin_grinta_runtime_paths
@@ -372,34 +373,21 @@ def _start_tokenizer_preloader() -> None:
     t.start()
 
 
-def main() -> None:
-    """Parse flags and launch the interactive REPL or a subcommand."""
-    _start_tokenizer_preloader()
-    parser = build_parser(include_subcommands=True)
+def _dispatch_subcommand(args: argparse.Namespace) -> None:
+    runners = {
+        'init': _run_init,
+        'doctor': _run_doctor,
+        'sessions': _run_sessions,
+    }
+    runner = runners.get(args.subcommand or '')
+    if runner is None:
+        return
+    rc = runner(args) or 0
+    sys.exit(int(rc))
 
-    args = parser.parse_args(sys.argv[1:])
-    _ensure_linux_host_tools_early()
 
-    # Subcommand dispatch.
-    if args.subcommand == 'init':
-        rc = _run_init(args) or 0
-        sys.exit(int(rc))
-
-    if args.subcommand == 'doctor':
-        rc = _run_doctor(args) or 0
-        sys.exit(int(rc))
-
-    if args.subcommand == 'sessions':
-        rc = _run_sessions(args) or 0
-        sys.exit(int(rc))
-
-    if args.subcommand is None:
-        from backend.core.workspace_resolution import resolve_launch_project_directory
-
-        _pin_project(str(resolve_launch_project_directory(args.project)))
-
-    repl_main = importlib.import_module('backend.cli.main').main
-    call_kwargs = {
+def _repl_call_kwargs(args: argparse.Namespace) -> dict[str, Any]:
+    call_kwargs: dict[str, Any] = {
         'model': args.model,
         'project': args.project,
         'cleanup_storage': args.cleanup_storage,
@@ -413,7 +401,26 @@ def main() -> None:
         call_kwargs['theme'] = args.theme
     if args.verbose:
         call_kwargs['verbose'] = True
-    repl_main(**call_kwargs)
+    return call_kwargs
+
+
+def main() -> None:
+    """Parse flags and launch the interactive REPL or a subcommand."""
+    _start_tokenizer_preloader()
+    parser = build_parser(include_subcommands=True)
+
+    args = parser.parse_args(sys.argv[1:])
+    _ensure_linux_host_tools_early()
+
+    _dispatch_subcommand(args)
+
+    if args.subcommand is None:
+        from backend.core.workspace_resolution import resolve_launch_project_directory
+
+        _pin_project(str(resolve_launch_project_directory(args.project)))
+
+    repl_main = importlib.import_module('backend.cli.main').main
+    repl_main(**_repl_call_kwargs(args))
 
 
 if __name__ == '__main__':

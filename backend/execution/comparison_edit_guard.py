@@ -77,21 +77,25 @@ class ComparisonEditGuard:
     @staticmethod
     def _path(path: str) -> None:
         pure = PurePosixPath(path)
-        if pure.is_absolute() or any(
-            part in ('', '.', '..') for part in path.split('/')
+        if pure.is_absolute() or not all(
+            part not in ('', '.', '..') for part in path.split('/')
         ):
             raise ComparisonContractError(f'unsupported source path: {path}')
         for part in pure.parts:
-            stem = part.split('.', 1)[0].upper()
-            if (
-                part.casefold() in {'.git', 'git~1'}
-                or part.endswith((' ', '.'))
-                or any(ord(c) < 32 or c in '\\:*?"<>|' for c in part)
-                or stem in {'CON', 'PRN', 'AUX', 'NUL'}
-                or stem
-                in {f'{prefix}{n}' for prefix in ('COM', 'LPT') for n in range(1, 10)}
-            ):
+            if ComparisonEditGuard._is_reserved_path_part(part):
                 raise ComparisonContractError(f'unsupported source path: {path}')
+
+    @staticmethod
+    def _is_reserved_path_part(part: str) -> bool:
+        stem = part.split('.', 1)[0].upper()
+        return (
+            part.casefold() in {'.git', 'git~1'}
+            or part.endswith((' ', '.'))
+            or any(ord(c) < 32 or c in '\\:*?"<>|' for c in part)
+            or stem in {'CON', 'PRN', 'AUX', 'NUL'}
+            or stem
+            in {f'{prefix}{n}' for prefix in ('COM', 'LPT') for n in range(1, 10)}
+        )
 
     @staticmethod
     def _folded_paths(tree: dict[str, tuple[str, str]]) -> dict[str, list[str]]:
@@ -127,8 +131,8 @@ class ComparisonEditGuard:
                 f'new source path collides with the starting tree: {path}'
             )
 
-    def _check_entries(
-        self,
+    @staticmethod
+    def _check_entry_modes(
         path: str,
         before: tuple[str, str] | None,
         after: tuple[str, str] | None,
@@ -143,17 +147,34 @@ class ComparisonEditGuard:
             )
         if before and after and before[0] != after[0]:
             raise ComparisonContractError(f'permission changes are unsupported: {path}')
+
+    def _check_entry_contents(
+        self,
+        path: str,
+        before: tuple[str, str] | None,
+        after: tuple[str, str] | None,
+    ) -> None:
         for entry in (before, after):
             if entry:
-                data = self._git('cat-file', 'blob', entry[1])
-                if b'\0' in data:
-                    raise ComparisonContractError(f'binary source change: {path}')
-                try:
-                    data.decode('utf-8')
-                except UnicodeDecodeError as exc:
-                    raise ComparisonContractError(
-                        f'non-UTF-8 source change: {path}'
-                    ) from exc
+                self._check_blob(path, entry[1])
+
+    def _check_blob(self, path: str, object_id: str) -> None:
+        data = self._git('cat-file', 'blob', object_id)
+        if b'\0' in data:
+            raise ComparisonContractError(f'binary source change: {path}')
+        try:
+            data.decode('utf-8')
+        except UnicodeDecodeError as exc:
+            raise ComparisonContractError(f'non-UTF-8 source change: {path}') from exc
+
+    def _check_entries(
+        self,
+        path: str,
+        before: tuple[str, str] | None,
+        after: tuple[str, str] | None,
+    ) -> None:
+        self._check_entry_modes(path, before, after)
+        self._check_entry_contents(path, before, after)
 
     def _validate_change(
         self,

@@ -291,6 +291,76 @@ def _sort_picker_entries(entries: list[ModelEntry]) -> None:
     )
 
 
+def _catalog_entries_by_provider() -> dict[str, list[ModelEntry]]:
+    catalog_by_provider: dict[str, list[ModelEntry]] = {}
+    for entry in get_catalog():
+        catalog_by_provider.setdefault(entry.provider, []).append(entry)
+    return catalog_by_provider
+
+
+def _local_picker_entries(
+    provider: str,
+    catalog_entries: list[ModelEntry],
+    *,
+    include_local: bool,
+) -> list[ModelEntry]:
+    entries: list[ModelEntry] = []
+    known_names: set[str] = set()
+
+    if include_local:
+        for model_id in get_local_model_names(provider):
+            bare = model_id.split('/')[-1] if '/' in model_id else model_id
+            if bare in known_names or model_id in known_names:
+                continue
+            entries.append(
+                _picker_entry_for_model_id(
+                    provider,
+                    model_id,
+                    source='local',
+                    display_name=model_id if model_id != bare else None,
+                )
+            )
+            known_names.add(bare)
+            if model_id != bare:
+                known_names.add(model_id)
+    if not entries and catalog_entries:
+        entries = _catalog_picker_entries(provider, catalog_entries)
+    return entries
+
+
+def _picker_entries_for_provider(
+    provider: str,
+    catalog_by_provider: dict[str, list[ModelEntry]],
+    *,
+    include_local: bool,
+) -> tuple[str, list[ModelEntry]] | None:
+    normalized = normalize_provider_name(provider)
+    if normalized is None:
+        return None
+
+    catalog_entries = catalog_by_provider.get(normalized, [])
+    if normalized in LOCAL_PROVIDERS:
+        entries = _local_picker_entries(
+            normalized,
+            catalog_entries,
+            include_local=include_local,
+        )
+    elif catalog_entries:
+        entries = _catalog_picker_entries(normalized, catalog_entries)
+    else:
+        entries = []
+
+    _sort_picker_entries(entries)
+    return normalized, entries
+
+
+def _ensure_picker_provider_keys(by_provider: dict[str, list[ModelEntry]]) -> None:
+    for prov in get_provider_ids():
+        by_provider.setdefault(prov, [])
+    for prov in LOCAL_PROVIDERS:
+        by_provider.setdefault(prov, [])
+
+
 def build_model_entries_by_provider(
     *,
     provider: str | None = None,
@@ -299,52 +369,51 @@ def build_model_entries_by_provider(
     """Build picker entries grouped by provider (catalog or local probe only)."""
     providers = [provider] if provider else get_listable_providers()
     by_provider: dict[str, list[ModelEntry]] = {}
-
-    catalog_by_provider: dict[str, list[ModelEntry]] = {}
-    for entry in get_catalog():
-        catalog_by_provider.setdefault(entry.provider, []).append(entry)
+    catalog_by_provider = _catalog_entries_by_provider()
 
     for prov in providers:
-        normalized = normalize_provider_name(prov)
-        if normalized is None:
+        resolved = _picker_entries_for_provider(
+            prov,
+            catalog_by_provider,
+            include_local=include_local,
+        )
+        if resolved is None:
             continue
-
-        catalog_entries = catalog_by_provider.get(normalized, [])
-        entries: list[ModelEntry] = []
-        known_names: set[str] = set()
-
-        if normalized in LOCAL_PROVIDERS:
-            if include_local:
-                for model_id in get_local_model_names(normalized):
-                    bare = model_id.split('/')[-1] if '/' in model_id else model_id
-                    if bare in known_names or model_id in known_names:
-                        continue
-                    entries.append(
-                        _picker_entry_for_model_id(
-                            normalized,
-                            model_id,
-                            source='local',
-                            display_name=model_id if model_id != bare else None,
-                        )
-                    )
-                    known_names.add(bare)
-                    if model_id != bare:
-                        known_names.add(model_id)
-            if not entries and catalog_entries:
-                entries = _catalog_picker_entries(normalized, catalog_entries)
-        elif catalog_entries:
-            entries = _catalog_picker_entries(normalized, catalog_entries)
-
-        _sort_picker_entries(entries)
+        normalized, entries = resolved
         by_provider[normalized] = entries
 
     if provider is None:
-        for prov in get_provider_ids():
-            by_provider.setdefault(prov, [])
-        for prov in LOCAL_PROVIDERS:
-            by_provider.setdefault(prov, [])
+        _ensure_picker_provider_keys(by_provider)
 
     return dict(sorted(by_provider.items()))
+
+
+def _config_api_key(config: Any, normalized: str) -> str | None:
+    try:
+        llm_cfg = config.get_llm_config()
+        current_provider = normalize_provider_name(getattr(llm_cfg, 'provider', None))
+        key = getattr(llm_cfg, 'api_key', None)
+        if key is None:
+            return None
+        if current_provider is not None and current_provider != normalized:
+            return None
+        raw = key.get_secret_value() if hasattr(key, 'get_secret_value') else str(key)
+        stripped = raw.strip()
+        return stripped or None
+    except Exception:
+        logger.debug('Could not read LLM api_key from config', exc_info=True)
+        return None
+
+
+def _env_api_key(normalized: str) -> str | None:
+    cfg = get_provider_configuration(normalized)
+    env_var = cfg.get('env_var')
+    if not env_var:
+        return None
+    import os
+
+    env_key = (os.environ.get(env_var) or '').strip()
+    return env_key or None
 
 
 def resolve_api_key_for_provider(config: Any, provider: str | None) -> str | None:
@@ -352,30 +421,10 @@ def resolve_api_key_for_provider(config: Any, provider: str | None) -> str | Non
     normalized = normalize_provider_name(provider)
     if normalized is None:
         return None
-    try:
-        llm_cfg = config.get_llm_config()
-        current_provider = normalize_provider_name(getattr(llm_cfg, 'provider', None))
-        key = getattr(llm_cfg, 'api_key', None)
-        if key is not None and (
-            current_provider is None or current_provider == normalized
-        ):
-            raw = (
-                key.get_secret_value() if hasattr(key, 'get_secret_value') else str(key)
-            )
-            if raw.strip():
-                return raw.strip()
-    except Exception:
-        logger.debug('Could not read LLM api_key from config', exc_info=True)
-
-    cfg = get_provider_configuration(normalized)
-    env_var = cfg.get('env_var')
-    if env_var:
-        import os
-
-        env_key = (os.environ.get(env_var) or '').strip()
-        if env_key:
-            return env_key
-    return None
+    key = _config_api_key(config, normalized)
+    if key is not None:
+        return key
+    return _env_api_key(normalized)
 
 
 def get_model_capabilities(model: str) -> ModelFeatures:

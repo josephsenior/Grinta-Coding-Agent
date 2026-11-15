@@ -139,23 +139,31 @@ def get_timeout_param(description: str) -> dict[str, Any]:
     }
 
 
+def _without_security_risk(required: list[str]) -> list[str] | None:
+    if 'security_risk' not in required:
+        return None
+    return [name for name in required if name != 'security_risk']
+
+
+def _relax_allof_clause_security_risk(clause: Any) -> None:
+    if not isinstance(clause, dict):
+        return
+    then = clause.get('then')
+    if not isinstance(then, dict):
+        return
+    relaxed = _without_security_risk(list(then.get('required') or []))
+    if relaxed is not None:
+        then['required'] = relaxed
+
+
 def _relax_security_risk_in_parameters(parameters: dict[str, Any]) -> dict[str, Any]:
     """Return a copy of *parameters* with ``security_risk`` no longer required."""
     params = copy.deepcopy(parameters)
-    required = list(params.get('required') or [])
-    if 'security_risk' in required:
-        params['required'] = [name for name in required if name != 'security_risk']
+    relaxed = _without_security_risk(list(params.get('required') or []))
+    if relaxed is not None:
+        params['required'] = relaxed
     for clause in list(params.get('allOf') or []):
-        if not isinstance(clause, dict):
-            continue
-        then = clause.get('then')
-        if not isinstance(then, dict):
-            continue
-        then_required = list(then.get('required') or [])
-        if 'security_risk' in then_required:
-            then['required'] = [
-                name for name in then_required if name != 'security_risk'
-            ]
+        _relax_allof_clause_security_risk(clause)
     return params
 
 

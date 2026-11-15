@@ -79,6 +79,43 @@ class MCPServerDiff:
         return bool(self.added or self.removed or self.changed)
 
 
+def _only_enabled_flag_changed(old: MCPServerConfig, new: MCPServerConfig) -> bool:
+    return old.enabled != new.enabled and (
+        old.command == new.command
+        and old.args == new.args
+        and old.url == new.url
+        and old.api_key == new.api_key
+        and old.env == new.env
+        and old.transport == new.transport
+    )
+
+
+def _diff_shared_servers(
+    old_map: dict[tuple[str, str], MCPServerConfig],
+    new_map: dict[tuple[str, str], MCPServerConfig],
+    shared_keys: Iterable[tuple[str, str]],
+) -> tuple[
+    dict[tuple[str, str], tuple[MCPServerConfig, MCPServerConfig]],
+    list[MCPServerConfig],
+    list[MCPServerConfig],
+]:
+    changed: dict[tuple[str, str], tuple[MCPServerConfig, MCPServerConfig]] = {}
+    enabled_toggled: list[MCPServerConfig] = []
+    unchanged: list[MCPServerConfig] = []
+
+    for k in sorted(shared_keys):
+        old_srv = old_map[k]
+        new_srv = new_map[k]
+        if old_srv == new_srv:
+            unchanged.append(new_srv)
+            continue
+        changed[k] = (old_srv, new_srv)
+        if _only_enabled_flag_changed(old_srv, new_srv):
+            enabled_toggled.append(new_srv)
+
+    return changed, enabled_toggled, unchanged
+
+
 def diff_mcp_servers(
     old: Iterable[MCPServerConfig] | None,
     new: Iterable[MCPServerConfig] | None,
@@ -94,32 +131,11 @@ def diff_mcp_servers(
     old_map = _servers_by_identity(old_list)
     new_map = _servers_by_identity(new_list)
 
-    added_keys = set(new_map) - set(old_map)
-    removed_keys = set(old_map) - set(new_map)
-    shared_keys = set(old_map) & set(new_map)
-
-    added = [new_map[k] for k in sorted(added_keys)]
-    removed = [old_map[k] for k in sorted(removed_keys)]
-    changed: dict[tuple[str, str], tuple[MCPServerConfig, MCPServerConfig]] = {}
-    enabled_toggled: list[MCPServerConfig] = []
-    unchanged: list[MCPServerConfig] = []
-
-    for k in sorted(shared_keys):
-        old_srv = old_map[k]
-        new_srv = new_map[k]
-        if old_srv == new_srv:
-            unchanged.append(new_srv)
-            continue
-        changed[k] = (old_srv, new_srv)
-        if old_srv.enabled != new_srv.enabled and (
-            old_srv.command == new_srv.command
-            and old_srv.args == new_srv.args
-            and old_srv.url == new_srv.url
-            and old_srv.api_key == new_srv.api_key
-            and old_srv.env == new_srv.env
-            and old_srv.transport == new_srv.transport
-        ):
-            enabled_toggled.append(new_srv)
+    added = [new_map[k] for k in sorted(set(new_map) - set(old_map))]
+    removed = [old_map[k] for k in sorted(set(old_map) - set(new_map))]
+    changed, enabled_toggled, unchanged = _diff_shared_servers(
+        old_map, new_map, set(old_map) & set(new_map)
+    )
 
     return MCPServerDiff(
         added=added,

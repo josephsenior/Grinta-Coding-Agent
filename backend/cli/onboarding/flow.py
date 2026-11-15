@@ -194,6 +194,45 @@ def _resolve_persisted_api_key(
     return (secret or '').strip()
 
 
+def _build_persisted_settings(
+    existing: dict[str, Any] | None,
+    *,
+    provider: str,
+    model: str,
+    secret: str,
+    base_url: str,
+    requires_api_key: bool,
+) -> dict[str, Any]:
+    if existing is None:
+        return build_init_settings(
+            provider=provider,
+            model=model,
+            api_key=secret,
+            base_url=base_url,
+            requires_api_key=requires_api_key,
+        )
+    merged_settings: dict[str, Any] = dict(existing)
+    merged_settings['llm_provider'] = provider
+    merged_settings['llm_model'] = model
+    merged_settings['llm_api_key'] = settings_api_key_value(
+        provider, secret, requires_key=requires_api_key
+    )
+    if base_url:
+        merged_settings['llm_base_url'] = base_url
+    return merged_settings
+
+
+def _persist_secret_to_dotenv(secret: str, settings_path: Path) -> None:
+    if not secret:
+        return
+    try:
+        from backend.core.config.dotenv_keys import persist_llm_api_key_to_dotenv
+
+        persist_llm_api_key_to_dotenv(secret, settings_json_path=settings_path)
+    except OSError:
+        logger.warning('Failed to persist env-detected API key to .env', exc_info=True)
+
+
 def persist_env_detected_settings(
     config: AppConfig,
     provider: str,
@@ -239,27 +278,14 @@ def persist_env_detected_settings(
     )
 
     existing = _read_existing_settings(settings_path)
-    if existing is None:
-        # First run — emit a complete init-shaped file.
-        settings = build_init_settings(
-            provider=provider,
-            model=model,
-            api_key=secret,
-            base_url=base_url,
-            requires_api_key=requires_api_key,
-        )
-    else:
-        # Subsequent run — merge only the LLM-related keys.
-        merged_settings: dict[str, Any] = dict(existing)
-        merged_settings['llm_provider'] = provider
-        merged_settings['llm_model'] = model
-        merged_settings['llm_api_key'] = settings_api_key_value(
-            provider, secret, requires_key=requires_api_key
-        )
-        if base_url:
-            merged_settings['llm_base_url'] = base_url
-        # Never blank out a user-configured base_url when env has none.
-        settings = merged_settings
+    settings = _build_persisted_settings(
+        existing,
+        provider=provider,
+        model=model,
+        secret=secret,
+        base_url=base_url,
+        requires_api_key=requires_api_key,
+    )
 
     try:
         _atomic_json_write(settings_path, settings)
@@ -267,15 +293,7 @@ def persist_env_detected_settings(
         logger.warning('Failed to write env-detected settings', exc_info=True)
         return False
 
-    if secret:
-        try:
-            from backend.core.config.dotenv_keys import persist_llm_api_key_to_dotenv
-
-            persist_llm_api_key_to_dotenv(secret, settings_json_path=settings_path)
-        except OSError:
-            logger.warning(
-                'Failed to persist env-detected API key to .env', exc_info=True
-            )
+    _persist_secret_to_dotenv(secret, settings_path)
     return True
 
 
