@@ -31,6 +31,9 @@ from backend.execution.browser._browser_interaction import (
     _scroll_directional as _scroll_directional_impl,
 )
 from backend.execution.browser._browser_interaction import (
+    _scroll_to_anchor as _scroll_to_anchor_impl,
+)
+from backend.execution.browser._browser_interaction import (
     _scroll_to_edge as _scroll_to_edge_impl,
 )
 from backend.execution.browser._browser_interaction import (
@@ -287,6 +290,11 @@ class GrintaNativeBrowser:
         self, cmd: str, browser: Any, params: dict[str, Any], direction: str
     ) -> Observation:
         return await _scroll_directional_impl(self, cmd, browser, params, direction)
+
+    async def _scroll_to_anchor(
+        self, cmd: str, browser: Any, params: dict[str, Any]
+    ) -> Observation | None:
+        return await _scroll_to_anchor_impl(self, cmd, browser, params)
 
     async def _dispatch_wait(
         self,
