@@ -3,6 +3,7 @@
 import asyncio
 import os
 import subprocess
+import sys
 from types import SimpleNamespace
 
 import pytest
@@ -60,7 +61,7 @@ def test_unsupported_state_poisoning_cannot_be_recovered_by_later_action(source,
     if kind == 'delete_binary':
         (repo / 'binary.dat').unlink()
     elif kind == 'case_collision':
-        if os.name == 'nt':
+        if os.name == 'nt' or sys.platform == 'darwin':
             pytest.skip(
                 'requires a case-sensitive filesystem; covered by Linux diagnostic'
             )
